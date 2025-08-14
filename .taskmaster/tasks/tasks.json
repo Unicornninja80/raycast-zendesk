@@ -1,0 +1,588 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Structure and Dependencies",
+        "description": "Initialize the Raycast extension project with TypeScript and React, set up the folder structure, and install necessary dependencies.",
+        "details": "1. Use Raycast CLI to create a new extension: `npx @raycast/api init zendesk-extension`\n2. Select TypeScript and React as the template\n3. Set up folder structure:\n   - `/src/components` - Reusable UI components\n   - `/src/api` - API client code\n   - `/src/utils` - Helper functions\n   - `/src/commands` - Command entry points\n4. Install additional dependencies:\n   ```bash\n   npm install --save axios\n   npm install --save-dev jest @types/jest ts-jest\n   ```\n5. Configure tsconfig.json for strict type checking\n6. Set up package.json with appropriate metadata and scripts",
+        "testStrategy": "Verify project structure is correctly set up. Run `npm run dev` to ensure the extension loads in Raycast without errors. Check TypeScript compilation with `npm run build`.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Raycast Extension Project",
+            "description": "Use Raycast CLI to create a new extension project with TypeScript and React template, setting up the initial project structure.",
+            "dependencies": [],
+            "details": "1. Run `npx @raycast/api init zendesk-extension` in terminal\n2. When prompted, select TypeScript and React as the template\n3. Navigate to the created project directory\n4. Review the generated files and understand the basic structure\n5. Run `npm run dev` to verify the extension loads correctly in Raycast",
+            "status": "pending",
+            "testStrategy": "Verify the extension appears in Raycast's developer extensions. Check that the basic command runs without errors."
+          },
+          {
+            "id": 2,
+            "title": "Configure Project Structure and Dependencies",
+            "description": "Set up the folder structure, install required dependencies, and configure TypeScript settings for the project.",
+            "dependencies": [],
+            "details": "1. Create the following folder structure:\n   - `/src/components` - For reusable UI components\n   - `/src/api` - For API client code\n   - `/src/utils` - For helper functions\n   - `/src/commands` - For command entry points\n2. Install additional dependencies:\n   ```bash\n   npm install --save axios\n   npm install --save-dev jest @types/jest ts-jest\n   ```\n3. Update tsconfig.json to enable strict type checking:\n   ```json\n   {\n     \"compilerOptions\": {\n       \"strict\": true,\n       \"noImplicitAny\": true,\n       \"strictNullChecks\": true\n     }\n   }\n   ```\n4. Create placeholder index files in each directory to maintain structure",
+            "status": "pending",
+            "testStrategy": "Run TypeScript compiler to ensure no configuration errors. Verify all dependencies install correctly with `npm list`."
+          },
+          {
+            "id": 3,
+            "title": "Configure Package Metadata and Scripts",
+            "description": "Update package.json with appropriate metadata, scripts, and configuration for the Zendesk extension.",
+            "dependencies": [],
+            "details": "1. Edit package.json to include:\n   - Appropriate name, title, and description\n   - Author information\n   - License\n   - Keywords for discoverability\n2. Configure scripts section:\n   ```json\n   \"scripts\": {\n     \"dev\": \"ray develop\",\n     \"build\": \"ray build -e dist\",\n     \"lint\": \"eslint --ext .ts,.tsx .\",\n     \"test\": \"jest\"\n   }\n   ```\n3. Set up Jest configuration in package.json:\n   ```json\n   \"jest\": {\n     \"preset\": \"ts-jest\",\n     \"testEnvironment\": \"node\",\n     \"testPathIgnorePatterns\": [\"/node_modules/\", \"/dist/\"]\n   }\n   ```\n4. Add Raycast-specific configuration for commands and preferences",
+            "status": "pending",
+            "testStrategy": "Validate package.json syntax. Run each script to ensure they're properly configured. Verify extension metadata appears correctly in Raycast."
+          },
+          {
+            "id": 4,
+            "title": "Setup Basic Extension Preferences",
+            "description": "Configure the extension's preferences to allow users to enter their Zendesk credentials and subdomain.",
+            "dependencies": [],
+            "details": "1. Add preferences to package.json:\n   ```json\n   \"preferences\": [\n     {\n       \"name\": \"subdomain\",\n       \"title\": \"Zendesk Subdomain\",\n       \"description\": \"Your Zendesk subdomain (e.g., 'company' for company.zendesk.com)\",\n       \"type\": \"textfield\",\n       \"required\": true\n     },\n     {\n       \"name\": \"email\",\n       \"title\": \"Email Address\",\n       \"description\": \"Email address used for Zendesk\",\n       \"type\": \"textfield\",\n       \"required\": true\n     },\n     {\n       \"name\": \"apiToken\",\n       \"title\": \"API Token\",\n       \"description\": \"Zendesk API token (generate from Admin > API in Zendesk)\",\n       \"type\": \"password\",\n       \"required\": true\n     }\n   ]\n   ```\n2. Create a utility file at src/utils/preferences.ts to access these values:\n   ```typescript\n   import { getPreferenceValues } from \"@raycast/api\";\n\n   interface ZendeskPreferences {\n     subdomain: string;\n     email: string;\n     apiToken: string;\n   }\n\n   export function getZendeskPreferences(): ZendeskPreferences {\n     return getPreferenceValues<ZendeskPreferences>();\n   }\n   ```",
+            "status": "pending",
+            "testStrategy": "Verify preferences appear correctly in Raycast UI. Test the preferences utility function returns expected values when preferences are set."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement Zendesk API Client",
+        "description": "Create a reusable Zendesk API client that handles authentication, rate limiting, and provides methods for ticket and article operations.",
+        "details": "Create `src/api/zendesk.ts` with:\n1. Basic authentication using email and API token\n2. Fetch wrapper with error handling and rate limit detection\n3. Implement backoff strategy using Retry-After header\n4. Core API methods:\n   ```typescript\n   export class ZendeskClient {\n     constructor(private subdomain: string, private email: string, private apiToken: string) {}\n     \n     private async fetch(endpoint: string, options?: RequestInit) {\n       // Handle auth, rate limits, errors\n       // Use exponential backoff on 429 responses\n     }\n     \n     async getTickets(query: string): Promise<Ticket[]> {}\n     async getTicketDetails(id: number): Promise<TicketDetail> {}\n     async updateTicketStatus(id: number, status: TicketStatus): Promise<void> {}\n     async assignTicketToMe(id: number): Promise<void> {}\n     async replyToTicket(id: number, comment: string, isPublic: boolean): Promise<void> {}\n     async searchArticles(query: string): Promise<Article[]> {}\n   }\n   ```\n5. Define TypeScript interfaces for all API responses",
+        "testStrategy": "Write unit tests for the API client using Jest mocks to simulate API responses, including success cases, rate limiting (429), and error scenarios. Test the backoff mechanism with mocked timers.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Authentication and Base Fetch Method",
+            "description": "Create the foundation of the Zendesk API client with authentication handling and a robust fetch method that handles errors and rate limiting.",
+            "dependencies": [],
+            "details": "1. Create `src/api/zendesk.ts` file\n2. Implement the ZendeskClient class constructor that accepts subdomain, email, and API token\n3. Create a private fetch method that:\n   - Constructs the full API URL using the subdomain\n   - Adds Basic Authentication headers using email and API token\n   - Handles HTTP errors and converts them to meaningful error messages\n   - Detects rate limiting (429 responses) and extracts the Retry-After header\n   - Implements exponential backoff strategy when rate limited\n4. Define TypeScript interfaces for API error responses\n5. Add utility methods for URL construction and authentication header generation",
+            "status": "pending",
+            "testStrategy": "Write unit tests for authentication header generation and URL construction. Mock fetch responses to test error handling and rate limiting detection. Use Jest's fake timers to test the backoff mechanism."
+          },
+          {
+            "id": 2,
+            "title": "Implement Ticket Management API Methods",
+            "description": "Add methods to the ZendeskClient class for retrieving, updating, and interacting with Zendesk tickets.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "1. Define TypeScript interfaces for Ticket, TicketDetail, and TicketStatus\n2. Implement the following methods in the ZendeskClient class:\n   - getTickets(query: string): Fetches a list of tickets based on search query\n   - getTicketDetails(id: number): Retrieves detailed information about a specific ticket\n   - updateTicketStatus(id: number, status: TicketStatus): Updates the status of a ticket\n   - assignTicketToMe(id: number): Assigns a ticket to the authenticated user\n   - replyToTicket(id: number, comment: string, isPublic: boolean): Adds a comment to a ticket\n3. Ensure all methods use the private fetch method for API calls\n4. Add proper error handling and type safety for all methods\n5. Document the expected format of the query parameter for getTickets()",
+            "status": "pending",
+            "testStrategy": "Create mock responses for each API endpoint and test each method individually. Verify correct URL construction and parameter handling. Test error scenarios and ensure they're properly propagated."
+          },
+          {
+            "id": 3,
+            "title": "Implement Article Search API Methods",
+            "description": "Add methods to the ZendeskClient class for searching and retrieving Zendesk Help Center articles.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "1. Define TypeScript interfaces for Article and related data structures\n2. Implement the searchArticles(query: string) method that:\n   - Connects to the Zendesk Help Center API\n   - Properly formats the search query\n   - Returns typed Article objects\n3. Add pagination support if the API returns paginated results\n4. Ensure proper error handling and type safety\n5. Document the expected format of the query parameter",
+            "status": "pending",
+            "testStrategy": "Create mock responses for article search API and test the method with various query parameters. Verify correct handling of pagination if applicable. Test error scenarios and ensure they're properly propagated."
+          },
+          {
+            "id": 4,
+            "title": "Create Client Factory and Integration Tests",
+            "description": "Implement a factory function to create ZendeskClient instances and write integration tests to verify the complete functionality of the API client.",
+            "dependencies": [
+              "2.1",
+              "2.2",
+              "2.3"
+            ],
+            "details": "1. Create a factory function `createZendeskClient(subdomain: string, email: string, apiToken: string)` that instantiates and returns a ZendeskClient\n2. Add validation for the input parameters (check for empty strings, proper formatting)\n3. Implement a method to test API connectivity that can be used to validate credentials\n4. Create a barrel export file to simplify imports\n5. Add comprehensive JSDoc comments to all public methods and interfaces\n6. Create example usage documentation in code comments\n7. Ensure all methods have consistent error handling patterns",
+            "status": "pending",
+            "testStrategy": "Write integration tests that combine multiple API operations in sequence (e.g., get tickets, get details for first ticket, reply to that ticket). Create a test configuration file for storing test credentials. Test the validation in the factory function with various invalid inputs."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement Preferences Management",
+        "description": "Set up preferences for storing Zendesk subdomain, email, and API token securely in Raycast.",
+        "details": "1. Create preferences.ts file to define preferences schema:\n```typescript\nexport interface Preferences {\n  subdomain: string;\n  email: string;\n  apiToken: string;\n}\n```\n\n2. Update package.json to include preferences configuration:\n```json\n\"preferences\": [\n  {\n    \"name\": \"subdomain\",\n    \"type\": \"textfield\",\n    \"required\": true,\n    \"title\": \"Zendesk Subdomain\",\n    \"description\": \"Your Zendesk subdomain (e.g., 'company' from company.zendesk.com)\",\n    \"placeholder\": \"company\"\n  },\n  {\n    \"name\": \"email\",\n    \"type\": \"textfield\",\n    \"required\": true,\n    \"title\": \"Email Address\",\n    \"description\": \"Email address associated with your Zendesk account\"\n  },\n  {\n    \"name\": \"apiToken\",\n    \"type\": \"password\",\n    \"required\": true,\n    \"title\": \"API Token\",\n    \"description\": \"Your Zendesk API token (found in Admin > Channels > API)\"\n  }\n]\n```\n\n3. Create a utility function to get preferences and initialize the API client:\n```typescript\nimport { getPreferenceValues } from \"@raycast/api\";\nimport { ZendeskClient } from \"./api/zendesk\";\n\nexport function getZendeskClient(): ZendeskClient {\n  const preferences = getPreferenceValues<Preferences>();\n  return new ZendeskClient(\n    preferences.subdomain,\n    preferences.email,\n    preferences.apiToken\n  );\n}\n```",
+        "testStrategy": "Test that preferences are correctly loaded and passed to the ZendeskClient. Verify error handling when preferences are missing or invalid.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Preferences Interface and Schema",
+            "description": "Create a preferences.ts file that defines the TypeScript interface for Zendesk preferences including subdomain, email, and API token.",
+            "dependencies": [],
+            "details": "Create a new file at src/utils/preferences.ts that exports the Preferences interface. This interface should define the structure of the preferences object with proper TypeScript types. Ensure the interface includes all required fields for Zendesk authentication: subdomain (string), email (string), and apiToken (string).",
+            "status": "pending",
+            "testStrategy": "Verify the interface is correctly typed and exported. Ensure it matches the preferences defined in package.json."
+          },
+          {
+            "id": 2,
+            "title": "Update Package.json with Preferences Configuration",
+            "description": "Modify the package.json file to include the Zendesk preferences configuration with appropriate descriptions and validation.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Add a 'preferences' array to package.json that defines the UI for collecting Zendesk credentials. Include three fields: subdomain (textfield), email (textfield), and apiToken (password). Set all as required and provide helpful descriptions and placeholders to guide users. Ensure the preference names match the interface defined in preferences.ts.",
+            "status": "pending",
+            "testStrategy": "Test that the extension correctly prompts for preferences on first run. Verify that the preferences UI displays correctly with appropriate descriptions and placeholders."
+          },
+          {
+            "id": 3,
+            "title": "Implement Utility Function to Access Preferences",
+            "description": "Create a utility function that retrieves the stored preferences and makes them available throughout the extension.",
+            "dependencies": [
+              "3.1",
+              "3.2"
+            ],
+            "details": "Add a getPreferences function to src/utils/preferences.ts that uses Raycast's getPreferenceValues API to retrieve the stored preferences. This function should return a properly typed Preferences object. Include basic validation to ensure all required fields are present.",
+            "status": "pending",
+            "testStrategy": "Test that the function correctly retrieves preferences. Test error handling when preferences are missing or invalid."
+          },
+          {
+            "id": 4,
+            "title": "Create ZendeskClient Initialization Function",
+            "description": "Implement a utility function that initializes the ZendeskClient using the stored preferences.",
+            "dependencies": [
+              "3.1",
+              "3.2",
+              "3.3"
+            ],
+            "details": "Add a getZendeskClient function to src/utils/preferences.ts that creates and returns a new instance of ZendeskClient initialized with the preferences. This function should retrieve preferences using the getPreferences function, then pass subdomain, email, and apiToken to the ZendeskClient constructor. Include error handling for missing or invalid preferences.",
+            "status": "pending",
+            "testStrategy": "Test that the function correctly initializes a ZendeskClient with the proper credentials. Verify error handling when preferences are missing or invalid. Test with mock preferences to ensure the client is configured correctly."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Implement Tickets List Command",
+        "description": "Create the main tickets command that displays a list of tickets with search functionality and actions.",
+        "details": "1. Create `src/commands/tickets.tsx` as the entry point\n2. Implement state management for tickets list and search query\n3. Use Raycast's List component with search bar\n4. Default query: `type:ticket assignee:me status<solved`\n5. Allow freeform search with debounced input\n6. Render ticket items showing subject, status tag, and last updated time\n7. Implement loading and empty states\n\n```typescript\nimport { List, ActionPanel, Action, showToast, Toast } from \"@raycast/api\";\nimport { useState, useEffect } from \"react\";\nimport { getZendeskClient } from \"../utils/preferences\";\nimport { Ticket } from \"../api/zendesk\";\n\nexport default function TicketsList() {\n  const [tickets, setTickets] = useState<Ticket[]>([]);\n  const [isLoading, setIsLoading] = useState(true);\n  const [searchText, setSearchText] = useState(\"\");\n  \n  useEffect(() => {\n    const fetchTickets = async () => {\n      try {\n        setIsLoading(true);\n        const client = getZendeskClient();\n        const query = searchText\n          ? searchText\n          : \"type:ticket assignee:me status<solved\";\n        const results = await client.getTickets(query);\n        setTickets(results);\n      } catch (error) {\n        showToast(Toast.Style.Failure, \"Failed to load tickets\", error.message);\n      } finally {\n        setIsLoading(false);\n      }\n    };\n    \n    // Debounce search\n    const timer = setTimeout(fetchTickets, 300);\n    return () => clearTimeout(timer);\n  }, [searchText]);\n  \n  return (\n    <List\n      isLoading={isLoading}\n      onSearchTextChange={setSearchText}\n      searchBarPlaceholder=\"Search tickets...\"\n    >\n      {tickets.map((ticket) => (\n        <List.Item\n          key={ticket.id}\n          title={ticket.subject}\n          subtitle={`#${ticket.id}`}\n          accessories={[\n            { tag: ticket.status },\n            { date: new Date(ticket.updated_at) }\n          ]}\n          actions={<TicketActions ticket={ticket} />}\n        />\n      ))}\n    </List>\n  );\n}\n\nfunction TicketActions({ ticket }: { ticket: Ticket }) {\n  return (\n    <ActionPanel>\n      <Action.Push\n        title=\"View Details\"\n        target={<TicketDetail id={ticket.id} />}\n      />\n      <Action.OpenInBrowser\n        url={`https://${getZendeskClient().subdomain}.zendesk.com/agent/tickets/${ticket.id}`}\n      />\n      {/* Add more actions */}\n    </ActionPanel>\n  );\n}\n```",
+        "testStrategy": "Test the component rendering with mock data. Verify search functionality works with debouncing. Test error handling when API calls fail. Ensure the default query is applied correctly.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up tickets command structure and state management",
+            "description": "Create the tickets command file and implement state management for tickets list, loading state, and search query with proper types.",
+            "dependencies": [],
+            "details": "Create `src/commands/tickets.tsx` file with the basic structure. Import necessary components from Raycast API and React hooks. Define state variables for tickets array, loading state, and search text. Set up proper TypeScript types for the ticket data. Implement the component skeleton that returns a List component with isLoading and onSearchTextChange props.",
+            "status": "pending",
+            "testStrategy": "Verify the component renders without errors. Test state initialization and updates when search text changes."
+          },
+          {
+            "id": 2,
+            "title": "Implement ticket fetching with debounced search",
+            "description": "Add the useEffect hook to fetch tickets from Zendesk API with debounced search functionality and proper error handling.",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Inside the TicketsList component, implement the useEffect hook that calls the Zendesk API. Use the getZendeskClient utility to get the client instance. Set up the query logic to use either the search text or the default query 'type:ticket assignee:me status<solved'. Implement debouncing with setTimeout and clearTimeout. Add proper error handling with showToast for API failures. Update the tickets state with the results and toggle loading state appropriately.",
+            "status": "pending",
+            "testStrategy": "Test the debounce functionality with different search inputs. Verify error handling works when API calls fail. Ensure the default query is applied correctly when search text is empty."
+          },
+          {
+            "id": 3,
+            "title": "Create ticket list item rendering",
+            "description": "Implement the rendering of ticket items in the list with proper formatting for subject, ID, status tag, and updated time.",
+            "dependencies": [
+              "4.1",
+              "4.2"
+            ],
+            "details": "Inside the List component, map through the tickets array to render List.Item components. Set the key prop to ticket.id. Display the ticket subject as the title and the ticket ID as the subtitle. Add accessories array with status tag and formatted date from ticket.updated_at. Ensure proper formatting for dates and status tags with appropriate styling.",
+            "status": "pending",
+            "testStrategy": "Test rendering with various ticket data formats. Verify the accessories display correctly with different status values and dates."
+          },
+          {
+            "id": 4,
+            "title": "Implement ticket actions panel",
+            "description": "Create the TicketActions component with action buttons for viewing details and opening tickets in browser.",
+            "dependencies": [
+              "4.3"
+            ],
+            "details": "Create a separate TicketActions function component that takes a ticket prop. Implement ActionPanel with Action.Push for viewing ticket details (pointing to a TicketDetail component to be implemented later). Add Action.OpenInBrowser that constructs the proper Zendesk URL using the subdomain from getZendeskClient and the ticket ID. Add placeholder comments for additional actions to be implemented in future tasks. Connect this component to each List.Item in the main component.",
+            "status": "pending",
+            "testStrategy": "Test that actions are correctly attached to list items. Verify the URL construction for OpenInBrowser action. Test navigation to the detail view works correctly."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement Ticket Detail View",
+        "description": "Create a detailed view for a single ticket that shows all relevant information and provides actions to modify the ticket.",
+        "details": "1. Create `src/components/TicketDetail.tsx` component\n2. Fetch and display detailed ticket information\n3. Show ticket subject, description, requester, assignee, status, and comments\n4. Implement actions: Open in browser, Reply, Assign to me, Change Status\n5. Add status change submenu with options (open, pending, on-hold, solved)\n\n```typescript\nimport { Detail, ActionPanel, Action, showToast, Toast } from \"@raycast/api\";\nimport { useState, useEffect } from \"react\";\nimport { getZendeskClient } from \"../utils/preferences\";\nimport { TicketDetail as TicketDetailType } from \"../api/zendesk\";\nimport { TicketReply } from \"./TicketReply\";\n\nexport function TicketDetail({ id }: { id: number }) {\n  const [ticket, setTicket] = useState<TicketDetailType | null>(null);\n  const [isLoading, setIsLoading] = useState(true);\n  \n  useEffect(() => {\n    const fetchTicket = async () => {\n      try {\n        setIsLoading(true);\n        const client = getZendeskClient();\n        const result = await client.getTicketDetails(id);\n        setTicket(result);\n      } catch (error) {\n        showToast(Toast.Style.Failure, \"Failed to load ticket\", error.message);\n      } finally {\n        setIsLoading(false);\n      }\n    };\n    \n    fetchTicket();\n  }, [id]);\n  \n  const handleStatusChange = async (status: string) => {\n    try {\n      const client = getZendeskClient();\n      await client.updateTicketStatus(id, status);\n      showToast(Toast.Style.Success, \"Ticket status updated\");\n      // Refresh ticket data\n      setIsLoading(true);\n      const result = await client.getTicketDetails(id);\n      setTicket(result);\n    } catch (error) {\n      showToast(Toast.Style.Failure, \"Failed to update status\", error.message);\n    } finally {\n      setIsLoading(false);\n    }\n  };\n  \n  const handleAssignToMe = async () => {\n    try {\n      const client = getZendeskClient();\n      await client.assignTicketToMe(id);\n      showToast(Toast.Style.Success, \"Ticket assigned to you\");\n      // Refresh ticket data\n      setIsLoading(true);\n      const result = await client.getTicketDetails(id);\n      setTicket(result);\n    } catch (error) {\n      showToast(Toast.Style.Failure, \"Failed to assign ticket\", error.message);\n    } finally {\n      setIsLoading(false);\n    }\n  };\n  \n  if (!ticket && !isLoading) {\n    return <Detail markdown=\"Ticket not found\" />;\n  }\n  \n  const markdown = ticket\n    ? `# ${ticket.subject}\\n\\n**Status:** ${ticket.status}\\n\\n**Requester:** ${ticket.requester.name}\\n\\n**Assignee:** ${ticket.assignee?.name || \"Unassigned\"}\\n\\n---\\n\\n${ticket.description}\\n\\n---\\n\\n## Comments\\n\\n${ticket.comments.map(c => `**${c.author.name}** (${new Date(c.created_at).toLocaleString()})\\n\\n${c.body}\\n\\n---\\n\\n`).join(\"\")}` \n    : \"Loading...\";\n  \n  return (\n    <Detail\n      markdown={markdown}\n      isLoading={isLoading}\n      actions={\n        <ActionPanel>\n          <Action.Push\n            title=\"Reply...\"\n            target={<TicketReply id={id} />}\n          />\n          <Action.OpenInBrowser\n            url={`https://${getZendeskClient().subdomain}.zendesk.com/agent/tickets/${id}`}\n          />\n          <Action\n            title=\"Assign to Me\"\n            onAction={handleAssignToMe}\n          />\n          <ActionPanel.Submenu title=\"Change Status\">\n            <Action title=\"Open\" onAction={() => handleStatusChange(\"open\")} />\n            <Action title=\"Pending\" onAction={() => handleStatusChange(\"pending\")} />\n            <Action title=\"On-Hold\" onAction={() => handleStatusChange(\"hold\")} />\n            <Action title=\"Solved\" onAction={() => handleStatusChange(\"solved\")} />\n          </ActionPanel.Submenu>\n        </ActionPanel>\n      }\n    />\n  );\n}\n```",
+        "testStrategy": "Test the component with mock ticket data. Verify all actions work correctly. Test error handling for API failures. Ensure status changes and assignment updates are reflected in the UI.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create TicketDetail component structure and data fetching",
+            "description": "Implement the basic structure of the TicketDetail component with data fetching logic to retrieve ticket information from the Zendesk API.",
+            "dependencies": [],
+            "details": "Create the src/components/TicketDetail.tsx file with the component skeleton. Implement useState hooks for ticket data and loading state. Set up the useEffect hook to fetch ticket details when the component mounts or when the ticket ID changes. Implement proper error handling using showToast for API failures. Create the basic Detail component structure that displays a loading state when data is being fetched.",
+            "status": "pending",
+            "testStrategy": "Test the component with mock ticket data to verify it correctly fetches and handles loading states. Test error handling by simulating API failures and verifying appropriate error messages are displayed."
+          },
+          {
+            "id": 2,
+            "title": "Implement ticket information display with markdown formatting",
+            "description": "Create the markdown template to display all ticket information including subject, status, requester, assignee, description, and comments in a well-formatted layout.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Build the markdown template string that formats the ticket data in a readable way. Include ticket subject as a heading, followed by metadata (status, requester, assignee) in bold. Add separators between sections. Format the ticket description and comments section with proper attribution showing author name and timestamp for each comment. Handle edge cases like missing assignee by showing 'Unassigned'. Implement conditional rendering to show appropriate content when ticket data is not available.",
+            "status": "pending",
+            "testStrategy": "Test the markdown rendering with various ticket data scenarios including tickets with multiple comments, tickets with no assignee, and tickets with special characters in the content. Verify the formatting is consistent and readable."
+          },
+          {
+            "id": 3,
+            "title": "Implement ticket action functionality",
+            "description": "Add action handlers for ticket operations including assigning to self and changing ticket status with proper API integration and UI feedback.",
+            "dependencies": [
+              "5.1",
+              "5.2"
+            ],
+            "details": "Implement the handleAssignToMe function that calls the Zendesk API to assign the current ticket to the authenticated user. Create the handleStatusChange function that updates the ticket status via the API. Both functions should show appropriate toast notifications for success and failure cases. Ensure the ticket data is refreshed after successful operations by re-fetching the ticket details. Implement proper loading states during API operations to prevent multiple simultaneous requests.",
+            "status": "pending",
+            "testStrategy": "Test each action handler by verifying API calls are made with correct parameters. Test success and error scenarios for each action. Verify the UI is updated correctly after successful operations. Test that loading states prevent multiple submissions."
+          },
+          {
+            "id": 4,
+            "title": "Implement ActionPanel with ticket operations",
+            "description": "Create the ActionPanel with all required ticket operations including Reply, Open in Browser, Assign to Me, and Change Status submenu.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.3"
+            ],
+            "details": "Add the ActionPanel component with all required actions. Implement the Reply action that pushes the TicketReply component to the navigation stack. Add the Open in Browser action that opens the ticket in the Zendesk web interface using the correct URL format. Implement the Assign to Me action that calls the handleAssignToMe function. Create the Change Status submenu with options for open, pending, on-hold, and solved statuses, each calling the handleStatusChange function with the appropriate status value. Ensure all actions are properly connected to their respective handler functions.",
+            "status": "pending",
+            "testStrategy": "Test each action in the ActionPanel to verify it performs the expected operation. Test the Reply action navigates to the TicketReply component. Test the Open in Browser action generates the correct URL. Test the Assign to Me action calls the appropriate handler. Test each status change option in the submenu calls handleStatusChange with the correct status value."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement Ticket Reply Functionality",
+        "description": "Create a form to reply to tickets with a public/private toggle and submit functionality.",
+        "details": "1. Create `src/components/TicketReply.tsx` component\n2. Implement a form with textarea for comment\n3. Add toggle for public/private reply\n4. Add submit button with loading state\n5. Handle success and error states\n\n```typescript\nimport { Form, ActionPanel, Action, showToast, Toast, useNavigation } from \"@raycast/api\";\nimport { useState } from \"react\";\nimport { getZendeskClient } from \"../utils/preferences\";\n\nexport function TicketReply({ id }: { id: number }) {\n  const [isSubmitting, setIsSubmitting] = useState(false);\n  const { pop } = useNavigation();\n  \n  async function handleSubmit(values: { comment: string; isPublic: boolean }) {\n    if (!values.comment.trim()) {\n      showToast(Toast.Style.Failure, \"Comment cannot be empty\");\n      return;\n    }\n    \n    try {\n      setIsSubmitting(true);\n      const client = getZendeskClient();\n      await client.replyToTicket(id, values.comment, values.isPublic);\n      showToast(Toast.Style.Success, \"Reply sent successfully\");\n      pop();\n    } catch (error) {\n      showToast(Toast.Style.Failure, \"Failed to send reply\", error.message);\n    } finally {\n      setIsSubmitting(false);\n    }\n  }\n  \n  return (\n    <Form\n      actions={\n        <ActionPanel>\n          <Action.SubmitForm\n            title=\"Send Reply\"\n            onSubmit={handleSubmit}\n          />\n        </ActionPanel>\n      }\n      isLoading={isSubmitting}\n    >\n      <Form.TextArea\n        id=\"comment\"\n        title=\"Comment\"\n        placeholder=\"Type your reply here...\"\n        enableMarkdown\n      />\n      <Form.Checkbox\n        id=\"isPublic\"\n        label=\"Public Reply\"\n        defaultValue={true}\n      />\n    </Form>\n  );\n}\n```",
+        "testStrategy": "Test form submission with various inputs. Verify public/private toggle works correctly. Test error handling for API failures. Ensure navigation works after successful submission.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3,
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create TicketReply Component Structure",
+            "description": "Create the basic structure of the TicketReply component with form elements and props interface",
+            "dependencies": [],
+            "details": "1. Create `src/components/TicketReply.tsx` file\n2. Import necessary Raycast components and React hooks\n3. Define the component props interface with `id` parameter\n4. Set up the basic form structure with textarea and checkbox\n5. Create the component skeleton with form elements but without submission logic",
+            "status": "pending",
+            "testStrategy": "Verify the component renders correctly with all form elements. Check that props are properly typed and passed down."
+          },
+          {
+            "id": 2,
+            "title": "Implement Form State Management",
+            "description": "Add state management for form submission and implement form validation",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "1. Add useState hook for tracking submission state\n2. Implement form validation to ensure comment is not empty\n3. Set up the ActionPanel with Submit action\n4. Connect the form elements to the submission handler\n5. Add loading state to the form during submission",
+            "status": "pending",
+            "testStrategy": "Test form validation with empty and valid inputs. Verify loading state is properly toggled during submission process."
+          },
+          {
+            "id": 3,
+            "title": "Implement Reply Submission Logic",
+            "description": "Create the handleSubmit function to process form data and send it to the Zendesk API",
+            "dependencies": [
+              "6.2"
+            ],
+            "details": "1. Implement the handleSubmit function to process form values\n2. Get Zendesk client instance using getZendeskClient utility\n3. Call the client's replyToTicket method with ticket id, comment text, and public/private flag\n4. Implement proper error handling with try/catch block\n5. Add toast notifications for success and error states",
+            "status": "pending",
+            "testStrategy": "Test the submission logic with mock API calls. Verify error handling works correctly when API calls fail. Test with both public and private reply options."
+          },
+          {
+            "id": 4,
+            "title": "Add Navigation and Final Polish",
+            "description": "Implement navigation after successful submission and add final polish to the component",
+            "dependencies": [
+              "6.3"
+            ],
+            "details": "1. Import and use the useNavigation hook to get access to navigation methods\n2. Add pop() navigation after successful submission to return to the ticket detail view\n3. Ensure the form resets properly after submission\n4. Add enableMarkdown property to the textarea for rich text support\n5. Add final polish with appropriate placeholder text and labels",
+            "status": "pending",
+            "testStrategy": "Test the complete flow from form input to submission to navigation. Verify the component integrates properly with the parent ticket detail view. Test markdown rendering in the textarea."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Implement Help Center Articles Command",
+        "description": "Create a command to search and browse Help Center articles with actions to open or copy URLs.",
+        "details": "1. Create `src/commands/articles.tsx` as the entry point\n2. Implement search functionality for Help Center articles\n3. Display article title and updated date\n4. Add actions to open in browser or copy URL\n\n```typescript\nimport { List, ActionPanel, Action, showToast, Toast, Clipboard } from \"@raycast/api\";\nimport { useState, useEffect } from \"react\";\nimport { getZendeskClient } from \"../utils/preferences\";\nimport { Article } from \"../api/zendesk\";\n\nexport default function ArticlesList() {\n  const [articles, setArticles] = useState<Article[]>([]);\n  const [isLoading, setIsLoading] = useState(true);\n  const [searchText, setSearchText] = useState(\"\");\n  \n  useEffect(() => {\n    const fetchArticles = async () => {\n      if (!searchText) {\n        setArticles([]);\n        setIsLoading(false);\n        return;\n      }\n      \n      try {\n        setIsLoading(true);\n        const client = getZendeskClient();\n        const results = await client.searchArticles(searchText);\n        setArticles(results);\n      } catch (error) {\n        showToast(Toast.Style.Failure, \"Failed to search articles\", error.message);\n      } finally {\n        setIsLoading(false);\n      }\n    };\n    \n    // Debounce search\n    const timer = setTimeout(fetchArticles, 300);\n    return () => clearTimeout(timer);\n  }, [searchText]);\n  \n  return (\n    <List\n      isLoading={isLoading}\n      onSearchTextChange={setSearchText}\n      searchBarPlaceholder=\"Search Help Center articles...\"\n    >\n      {articles.map((article) => (\n        <List.Item\n          key={article.id}\n          title={article.title}\n          accessories={[{ date: new Date(article.updated_at) }]}\n          actions={\n            <ActionPanel>\n              <Action.OpenInBrowser url={article.html_url} />\n              <Action\n                title=\"Copy URL\"\n                onAction={() => {\n                  Clipboard.copy(article.html_url);\n                  showToast(Toast.Style.Success, \"URL copied to clipboard\");\n                }}\n              />\n            </ActionPanel>\n          }\n        />\n      ))}\n    </List>\n  );\n}\n```",
+        "testStrategy": "Test search functionality with debouncing. Verify article rendering with mock data. Test URL opening and copying actions. Ensure empty state is handled correctly when no search text is provided.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Article Type and API Methods",
+            "description": "Create the Article interface and implement the searchArticles method in the Zendesk API client to fetch articles based on search text.",
+            "dependencies": [],
+            "details": "1. Add the Article interface to src/api/zendesk.ts:\n```typescript\nexport interface Article {\n  id: number;\n  title: string;\n  html_url: string;\n  updated_at: string;\n  // Add other relevant fields as needed\n}\n```\n2. Implement the searchArticles method in the ZendeskClient class:\n```typescript\nasync searchArticles(query: string): Promise<Article[]> {\n  const endpoint = `/api/v2/help_center/articles/search.json?query=${encodeURIComponent(query)}`;\n  const response = await this.fetch(endpoint);\n  return response.results || [];\n}\n```\n3. Ensure proper error handling and rate limiting are applied to the API call.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for the searchArticles method using mocked API responses. Test with various search queries, empty results, and error scenarios."
+          },
+          {
+            "id": 2,
+            "title": "Create Articles Command Component Structure",
+            "description": "Set up the basic structure of the articles.tsx command file with state management and UI components.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "1. Create src/commands/articles.tsx with the basic component structure:\n```typescript\nimport { List, ActionPanel, Action, showToast, Toast, Clipboard } from \"@raycast/api\";\nimport { useState, useEffect } from \"react\";\nimport { getZendeskClient } from \"../utils/preferences\";\nimport { Article } from \"../api/zendesk\";\n\nexport default function ArticlesList() {\n  const [articles, setArticles] = useState<Article[]>([]);\n  const [isLoading, setIsLoading] = useState(true);\n  const [searchText, setSearchText] = useState(\"\");\n  \n  // Implement useEffect for search later\n  \n  return (\n    <List\n      isLoading={isLoading}\n      onSearchTextChange={setSearchText}\n      searchBarPlaceholder=\"Search Help Center articles...\"\n    >\n      {/* Article items will be rendered here */}\n    </List>\n  );\n}\n```\n2. Ensure the component imports all necessary dependencies and sets up the initial state correctly.",
+            "status": "pending",
+            "testStrategy": "Test the basic rendering of the component with empty state. Verify that the search bar appears and state updates correctly when text is entered."
+          },
+          {
+            "id": 3,
+            "title": "Implement Search Functionality with Debouncing",
+            "description": "Add the search functionality to fetch articles based on user input with debouncing to prevent excessive API calls.",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "1. Implement the useEffect hook with debouncing in the ArticlesList component:\n```typescript\nuseEffect(() => {\n  const fetchArticles = async () => {\n    if (!searchText) {\n      setArticles([]);\n      setIsLoading(false);\n      return;\n    }\n    \n    try {\n      setIsLoading(true);\n      const client = getZendeskClient();\n      const results = await client.searchArticles(searchText);\n      setArticles(results);\n    } catch (error) {\n      showToast(Toast.Style.Failure, \"Failed to search articles\", error.message);\n    } finally {\n      setIsLoading(false);\n    }\n  };\n  \n  // Debounce search\n  const timer = setTimeout(fetchArticles, 300);\n  return () => clearTimeout(timer);\n}, [searchText]);\n```\n2. Ensure proper error handling is implemented for API failures.\n3. Add appropriate loading states during search operations.",
+            "status": "pending",
+            "testStrategy": "Test the debouncing mechanism to ensure it prevents excessive API calls. Verify that the loading state is correctly managed during searches. Test error handling by simulating API failures."
+          },
+          {
+            "id": 4,
+            "title": "Render Article Items with Actions",
+            "description": "Implement the rendering of article items in the list with actions to open in browser or copy URL.",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "1. Complete the List component by adding the article items rendering:\n```typescript\n<List\n  isLoading={isLoading}\n  onSearchTextChange={setSearchText}\n  searchBarPlaceholder=\"Search Help Center articles...\"\n>\n  {articles.map((article) => (\n    <List.Item\n      key={article.id}\n      title={article.title}\n      accessories={[{ date: new Date(article.updated_at) }]}\n      actions={\n        <ActionPanel>\n          <Action.OpenInBrowser url={article.html_url} />\n          <Action\n            title=\"Copy URL\"\n            onAction={() => {\n              Clipboard.copy(article.html_url);\n              showToast(Toast.Style.Success, \"URL copied to clipboard\");\n            }}\n          />\n        </ActionPanel>\n      }\n    />\n  ))}\n</List>\n```\n2. Add empty state handling when no articles are found.\n3. Ensure the date is properly formatted in the accessories.",
+            "status": "pending",
+            "testStrategy": "Test the rendering of article items with mock data. Verify that the actions (open in browser and copy URL) work correctly. Test the empty state when no articles are found or when search text is empty."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Implement Error Handling and Toast Notifications",
+        "description": "Create a consistent error handling system with user-friendly toast notifications throughout the extension.",
+        "details": "1. Create `src/utils/error.ts` for centralized error handling\n2. Implement functions to handle common API errors\n3. Create helper functions for toast notifications\n\n```typescript\nimport { showToast, Toast } from \"@raycast/api\";\n\nexport class ZendeskError extends Error {\n  constructor(message: string, public statusCode?: number, public retryAfter?: number) {\n    super(message);\n    this.name = \"ZendeskError\";\n  }\n}\n\nexport async function handleApiError(error: unknown): Promise<never> {\n  if (error instanceof ZendeskError) {\n    if (error.statusCode === 429) {\n      await showToast({\n        style: Toast.Style.Failure,\n        title: \"Rate limit exceeded\",\n        message: `Try again in ${error.retryAfter || 'a few'} seconds`,\n      });\n    } else if (error.statusCode === 401) {\n      await showToast({\n        style: Toast.Style.Failure,\n        title: \"Authentication failed\",\n        message: \"Please check your API token and email in preferences\",\n      });\n    } else if (error.statusCode === 403) {\n      await showToast({\n        style: Toast.Style.Failure,\n        title: \"Permission denied\",\n        message: \"You don't have permission to perform this action\",\n      });\n    } else {\n      await showToast({\n        style: Toast.Style.Failure,\n        title: \"Zendesk API error\",\n        message: error.message,\n      });\n    }\n  } else {\n    await showToast({\n      style: Toast.Style.Failure,\n      title: \"Unexpected error\",\n      message: error instanceof Error ? error.message : String(error),\n    });\n  }\n  \n  throw error;\n}\n\nexport function showSuccessToast(title: string, message?: string): Promise<void> {\n  return showToast({\n    style: Toast.Style.Success,\n    title,\n    message,\n  });\n}\n```",
+        "testStrategy": "Write unit tests for error handling functions. Test with various error types and status codes. Verify toast messages are appropriate for each error type.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement ZendeskError Class and Basic Error Handling",
+            "description": "Create the error utility file with a custom ZendeskError class and implement the basic error handling function to process API errors.",
+            "dependencies": [],
+            "details": "Create src/utils/error.ts with the ZendeskError class that extends Error and includes statusCode and retryAfter properties. Implement the handleApiError function that categorizes errors based on status codes (401, 403, 429) and displays appropriate toast notifications. This function should handle both ZendeskError instances and generic errors, showing user-friendly messages in each case.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for the ZendeskError class and handleApiError function. Test with various error types including different status codes (401, 403, 429) and verify the correct toast messages are generated for each scenario."
+          },
+          {
+            "id": 2,
+            "title": "Implement Toast Notification Helpers",
+            "description": "Create helper functions for displaying success, warning, and failure toast notifications with consistent styling throughout the extension.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Extend src/utils/error.ts to include helper functions for different types of toast notifications: showSuccessToast, showWarningToast, and showFailureToast. Each function should accept title and optional message parameters and use the appropriate Toast.Style from Raycast API. Ensure consistent styling and behavior across all notification types.",
+            "status": "pending",
+            "testStrategy": "Test each toast helper function to verify they display the correct style, title, and message. Mock the Raycast showToast API to verify the correct parameters are passed."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Error Handling with API Client",
+            "description": "Update the Zendesk API client to use the centralized error handling system, ensuring all API errors are properly caught and processed.",
+            "dependencies": [
+              "8.1",
+              "8.2"
+            ],
+            "details": "Modify the ZendeskClient class in src/api/zendesk.ts to use the handleApiError function for all API requests. Update the fetch wrapper method to catch HTTP errors and transform them into ZendeskError instances with appropriate status codes. Implement retry logic for rate-limited requests (429 errors) using the retryAfter value from response headers.",
+            "status": "pending",
+            "testStrategy": "Test the API client with mocked responses for various error scenarios (401, 403, 429, 500). Verify that errors are correctly transformed into ZendeskError instances and that the handleApiError function is called. Test the retry mechanism for rate-limited requests."
+          },
+          {
+            "id": 4,
+            "title": "Implement Global Error Boundary",
+            "description": "Create a React error boundary component to catch and handle unhandled errors in the UI components, preventing the extension from crashing.",
+            "dependencies": [
+              "8.1",
+              "8.2"
+            ],
+            "details": "Create src/components/ErrorBoundary.tsx that implements React's ErrorBoundary pattern. The component should catch unhandled errors in child components, display a user-friendly error message using the toast notification helpers, and provide a way to recover or restart the affected command. Update the main command files to wrap their content with this ErrorBoundary component.",
+            "status": "pending",
+            "testStrategy": "Test the ErrorBoundary component by deliberately throwing errors in child components and verifying the error is caught and handled properly. Ensure the error message is displayed correctly and that the recovery mechanism works as expected."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Implement Rate Limit Handling",
+        "description": "Add robust rate limit handling with exponential backoff based on Zendesk API's Retry-After header.",
+        "details": "1. Enhance the Zendesk API client to handle rate limits\n2. Implement exponential backoff strategy\n3. Add retry mechanism for failed requests\n\n```typescript\n// Add to zendesk.ts client\n\nprivate async fetchWithRetry(\n  endpoint: string,\n  options?: RequestInit,\n  retries = 3,\n  backoff = 1000\n): Promise<Response> {\n  try {\n    const response = await this.fetch(endpoint, options);\n    \n    if (response.status === 429) {\n      // Rate limited\n      const retryAfter = parseInt(response.headers.get(\"Retry-After\") || \"5\", 10);\n      const retryMs = retryAfter * 1000;\n      \n      if (retries > 0) {\n        console.log(`Rate limited. Retrying after ${retryAfter} seconds...`);\n        await new Promise(resolve => setTimeout(resolve, retryMs));\n        return this.fetchWithRetry(endpoint, options, retries - 1, backoff * 2);\n      } else {\n        throw new ZendeskError(\n          \"Rate limit exceeded and max retries reached\",\n          429,\n          retryAfter\n        );\n      }\n    }\n    \n    return response;\n  } catch (error) {\n    if (error instanceof ZendeskError) {\n      throw error;\n    }\n    \n    if (retries > 0 && error instanceof Error && error.message.includes(\"network\")) {\n      // Network error, retry with backoff\n      console.log(`Network error. Retrying in ${backoff/1000} seconds...`);\n      await new Promise(resolve => setTimeout(resolve, backoff));\n      return this.fetchWithRetry(endpoint, options, retries - 1, backoff * 2);\n    }\n    \n    throw error;\n  }\n}\n\n// Use fetchWithRetry in all API methods\nasync getTickets(query: string): Promise<Ticket[]> {\n  const encodedQuery = encodeURIComponent(query);\n  const response = await this.fetchWithRetry(`/api/v2/search.json?query=${encodedQuery}`);\n  const data = await response.json();\n  return data.results;\n}\n```",
+        "testStrategy": "Test rate limit handling with mocked responses including Retry-After headers. Verify exponential backoff works correctly. Test retry mechanism with network errors. Ensure maximum retry limit is respected.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create ZendeskError class and update client interface",
+            "description": "Create a custom ZendeskError class to handle rate limit errors and update the ZendeskClient interface to include the fetchWithRetry method.",
+            "dependencies": [],
+            "details": "Create a new ZendeskError class that extends Error to handle rate limit specific errors. The class should include status code and retry-after information. Update the ZendeskClient interface to include the fetchWithRetry method signature. This will establish the foundation for implementing the rate limit handling functionality.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for the ZendeskError class to ensure it correctly captures and exposes rate limit information. Test different constructor parameters and verify error messages are formatted correctly."
+          },
+          {
+            "id": 2,
+            "title": "Implement fetchWithRetry method with rate limit detection",
+            "description": "Implement the fetchWithRetry method that detects 429 rate limit responses and extracts the Retry-After header.",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Implement the fetchWithRetry method in the ZendeskClient class that wraps the existing fetch method. Add logic to detect 429 status codes and extract the Retry-After header. Parse the header value to determine the wait time before retrying. The method should accept parameters for endpoint, request options, retry count, and backoff duration.",
+            "status": "pending",
+            "testStrategy": "Test the fetchWithRetry method with mocked responses that include 429 status codes and various Retry-After header values. Verify the method correctly parses the header and prepares for retry operations."
+          },
+          {
+            "id": 3,
+            "title": "Implement exponential backoff and retry mechanism",
+            "description": "Add the exponential backoff logic and retry mechanism to the fetchWithRetry method for both rate limit and network errors.",
+            "dependencies": [
+              "9.2"
+            ],
+            "details": "Enhance the fetchWithRetry method to implement exponential backoff by doubling the backoff time with each retry attempt. Add a delay mechanism using setTimeout wrapped in a Promise. Implement retry logic for both rate limit (429) responses and network errors. Ensure the method respects the maximum retry count and throws appropriate errors when retries are exhausted.",
+            "status": "pending",
+            "testStrategy": "Test the exponential backoff logic with different initial backoff values and retry counts. Use Jest's timer mocks to verify the correct delay times are used. Test both rate limit scenarios and network error scenarios to ensure proper retry behavior."
+          },
+          {
+            "id": 4,
+            "title": "Update all API methods to use fetchWithRetry",
+            "description": "Refactor all existing API methods in the ZendeskClient to use the new fetchWithRetry method instead of the direct fetch method.",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "Update all API methods in the ZendeskClient class (getTickets, getTicket, createComment, etc.) to use the new fetchWithRetry method instead of the direct fetch method. Ensure proper error handling is maintained throughout the client. Add appropriate retry counts and initial backoff values for different API operations based on their criticality and expected response times.",
+            "status": "pending",
+            "testStrategy": "Test each refactored API method to ensure it correctly uses fetchWithRetry. Verify that API methods handle rate limits and retries correctly. Test integration with actual API endpoints in a controlled environment to confirm the retry mechanism works in real-world scenarios."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Create Documentation and Finalize Extension",
+        "description": "Create comprehensive documentation, add icons, and prepare the extension for distribution.",
+        "details": "1. Create README.md with:\n   - Installation instructions\n   - Setup guide for Zendesk API token\n   - Screenshots of main features\n   - Keyboard shortcuts reference\n   - Troubleshooting section\n\n2. Add extension icons:\n   - Create `assets` folder\n   - Add command icons for tickets and articles commands\n   - Add extension icon\n\n3. Update package.json with final metadata:\n   ```json\n   {\n     \"name\": \"zendesk\",\n     \"title\": \"Zendesk\",\n     \"description\": \"Quickly access and manage Zendesk tickets and Help Center articles\",\n     \"icon\": \"command-icon.png\",\n     \"author\": {\n       \"name\": \"Your Name\",\n       \"email\": \"your.email@example.com\"\n     },\n     \"categories\": [\n       \"Productivity\",\n       \"Developer Tools\"\n     ],\n     \"license\": \"MIT\"\n   }\n   ```\n\n4. Final testing and optimization:\n   - Test all commands and actions\n   - Optimize performance for large ticket lists\n   - Ensure error messages are user-friendly\n   - Check keyboard navigation works smoothly\n\n5. Prepare for distribution:\n   - Run `npm run build` to verify build succeeds\n   - Test in Raycast store development mode\n   - Create a release version",
+        "testStrategy": "Verify README contains all required sections. Test installation from scratch following the documentation. Ensure all icons display correctly. Verify the extension works in Raycast store development mode.",
+        "priority": "low",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Comprehensive README.md Documentation",
+            "description": "Create a detailed README.md file that includes installation instructions, setup guide, feature screenshots, keyboard shortcuts, and troubleshooting information.",
+            "dependencies": [],
+            "details": "1. Create a README.md file in the root directory\n2. Add a project title and brief description\n3. Include installation instructions with step-by-step guide\n4. Create a setup section explaining how to obtain and configure the Zendesk API token\n5. Add screenshots of main features (tickets list, article search, etc.)\n6. Document all keyboard shortcuts and actions available in the extension\n7. Include a troubleshooting section addressing common issues\n8. Add a license section with MIT license details\n9. Include a 'Contributing' section with guidelines for contributors",
+            "status": "pending",
+            "testStrategy": "Review the README.md for completeness and accuracy. Have someone unfamiliar with the project follow the installation instructions to verify clarity. Check that all screenshots are current and properly display features."
+          },
+          {
+            "id": 2,
+            "title": "Create and Add Extension Icons",
+            "description": "Design and add all necessary icons for the extension, including the main extension icon and command-specific icons.",
+            "dependencies": [],
+            "details": "1. Create an 'assets' folder in the project root\n2. Design or source a main extension icon (512x512px PNG)\n3. Create smaller versions of the extension icon (16x16, 32x32, 64x64, 128x128px)\n4. Design command-specific icons:\n   - Ticket list icon\n   - Article search icon\n   - Create ticket icon\n   - Recent tickets icon\n5. Ensure all icons follow Raycast's design guidelines\n6. Optimize all PNG files for size\n7. Update references to icons in command files and package.json",
+            "status": "pending",
+            "testStrategy": "Verify all icons display correctly in Raycast's UI. Check icon rendering at different sizes. Ensure icons are properly optimized for file size without quality loss."
+          },
+          {
+            "id": 3,
+            "title": "Update Package.json with Final Metadata",
+            "description": "Finalize the package.json file with complete metadata, including name, description, author information, categories, and license.",
+            "dependencies": [],
+            "details": "1. Update the package.json file with the following metadata:\n   - Set name to 'zendesk'\n   - Set title to 'Zendesk'\n   - Add comprehensive description\n   - Set icon path to the main extension icon\n   - Add author name and email\n   - Set appropriate categories (Productivity, Developer Tools)\n   - Set license to MIT\n2. Verify all command entries are correctly defined\n3. Ensure all dependencies are properly listed with correct versions\n4. Update version number to appropriate release version (e.g., 1.0.0)\n5. Add keywords for better discoverability in the Raycast store",
+            "status": "pending",
+            "testStrategy": "Validate package.json syntax. Verify all fields are correctly populated. Check that the extension appears correctly in Raycast with the proper metadata."
+          },
+          {
+            "id": 4,
+            "title": "Perform Final Testing and Prepare for Distribution",
+            "description": "Conduct comprehensive testing of all features, optimize performance, and prepare the extension for distribution in the Raycast store.",
+            "dependencies": [
+              "10.1",
+              "10.2",
+              "10.3"
+            ],
+            "details": "1. Run a complete build with `npm run build` to verify no compilation errors\n2. Test all commands and features:\n   - Ticket listing and search\n   - Article search and viewing\n   - All actions (open in browser, copy link, etc.)\n   - Error handling scenarios\n3. Optimize performance for large ticket lists\n4. Ensure all error messages are user-friendly and helpful\n5. Test keyboard navigation throughout the extension\n6. Verify the extension works with the Raycast store development mode\n7. Create a release version with appropriate version number\n8. Document any known issues or limitations\n9. Prepare release notes for the initial version",
+            "status": "pending",
+            "testStrategy": "Perform end-to-end testing of all features. Test with different Zendesk accounts and varying amounts of data. Verify performance with large ticket lists. Have multiple users test the extension and provide feedback before final submission."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-14T14:36:22.646Z",
+      "updated": "2025-08-14T14:36:22.646Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
