@@ -2,7 +2,7 @@
   "name": "raycast-zendesk",
   "version": "0.1.0",
   "description": "Work with Zendesk tickets and Help Center articles",
-  "author": "Justin Martin",
+  "author": "justin_martin",
   "license": "MIT",
   "homepage": "https://github.com/Unicornninja80/raycast-zendesk",
   "repository": {
@@ -15,7 +15,8 @@
     "dev": "ray dev",
     "lint": "eslint --ext .ts,.tsx src",
     "lint:fix": "eslint --ext .ts,.tsx src --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "publish": "npx @raycast/api@latest publish"
   },
   "dependencies": {
     "@raycast/api": "1.102.4"
