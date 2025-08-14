@@ -4,10 +4,10 @@
   "description": "Work with Zendesk tickets and Help Center articles",
   "author": "Justin Martin",
   "license": "MIT",
-  "homepage": "https://github.com/justinmartin/raycast-zendesk",
+  "homepage": "https://github.com/Unicornninja80/raycast-zendesk",
   "repository": {
     "type": "git",
-    "url": "https://github.com/justinmartin/raycast-zendesk.git"
+    "url": "https://github.com/Unicornninja80/raycast-zendesk.git"
   },
   "private": true,
   "scripts": {
