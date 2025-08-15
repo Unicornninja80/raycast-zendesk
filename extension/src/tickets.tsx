@@ -74,8 +74,7 @@ export default function Tickets() {
   const [query, setQuery] = useState("type:ticket assignee:me status<solved");
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [currentSelection, setCurrentSelection] = useState<string>("all");
+  const [onlyOpenTickets, setOnlyOpenTickets] = useState<boolean>(false);
 
   async function load(q: string) {
     setLoading(true);
@@ -100,10 +99,8 @@ export default function Tickets() {
     }
   }
 
-  function buildQuery(assignmentType: "me" | "group", groupId?: number, status?: string) {
-    const statusPart = status === "open" ? "status:open" : 
-                      status === "pending" ? "status:pending" : 
-                      "status<solved";
+  function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean) {
+    const statusPart = openOnly ? "status:open" : "status<solved";
     
     if (assignmentType === "me") {
       return `type:ticket assignee:me ${statusPart}`;
@@ -116,35 +113,23 @@ export default function Tickets() {
   function handleAssignmentTypeChange(type: "me" | "group", groupId?: number) {
     if (type === "me") {
       setSelectedGroupId(null);
-      setQuery(buildQuery("me", undefined, statusFilter));
+      setQuery(buildQuery("me", undefined, onlyOpenTickets));
     } else if (type === "group" && groupId) {
       setSelectedGroupId(groupId);
-      setQuery(buildQuery("group", groupId, statusFilter));
+      setQuery(buildQuery("group", groupId, onlyOpenTickets));
     }
   }
 
-  function handleDropdownChange(value: string) {
-    setCurrentSelection(value);
-    
-    if (value === "all" || value === "open" || value === "pending") {
-      // Status filter change
-      setStatusFilter(value);
-      if (selectedGroupId) {
-        setQuery(buildQuery("group", selectedGroupId, value));
-      } else {
-        setQuery(buildQuery("me", undefined, value));
-      }
-    } else if (value === "assignment-me") {
-      // Assignment change to "me"
-      setSelectedGroupId(null);
-      setQuery(buildQuery("me", undefined, statusFilter));
-    } else if (value.startsWith("assignment-group-")) {
-      // Assignment change to a group
-      const groupId = parseInt(value.replace("assignment-group-", ""));
-      setSelectedGroupId(groupId);
-      setQuery(buildQuery("group", groupId, statusFilter));
+  function handleOpenTicketsToggle(checked: boolean) {
+    setOnlyOpenTickets(checked);
+    if (selectedGroupId) {
+      setQuery(buildQuery("group", selectedGroupId, checked));
+    } else {
+      setQuery(buildQuery("me", undefined, checked));
     }
   }
+
+
 
   useEffect(() => {
     load(query);
@@ -162,26 +147,37 @@ export default function Tickets() {
       throttle
       searchBarAccessory={
         <List.Dropdown 
-          tooltip="Filter Tickets" 
-          value={currentSelection}
-          onChange={handleDropdownChange}
+          tooltip="Select Assignment" 
+          value={selectedGroupId ? `group-${selectedGroupId}` : "me"}
+          onChange={(value) => {
+            if (value === "me") {
+              handleAssignmentTypeChange("me");
+            } else if (value.startsWith("group-")) {
+              const groupId = parseInt(value.replace("group-", ""));
+              handleAssignmentTypeChange("group", groupId);
+            }
+          }}
         >
-          <List.Dropdown.Section title="Status Filter">
-            <List.Dropdown.Item value="all" title="🎫 All Tickets (Open + Pending)" />
-            <List.Dropdown.Item value="open" title="🟢 Open Only" />
-            <List.Dropdown.Item value="pending" title="🟡 Pending Only" />
-          </List.Dropdown.Section>
-          <List.Dropdown.Section title="Assignment">
-            <List.Dropdown.Item value="assignment-me" title="👤 My Assignments" />
-            {groups.map(group => (
-              <List.Dropdown.Item 
-                key={`assignment-group-${group.id}`}
-                value={`assignment-group-${group.id}`} 
-                title={`👥 Group: ${group.name}`} 
-              />
-            ))}
-          </List.Dropdown.Section>
+          <List.Dropdown.Item value="me" title="My Tickets" />
+          {groups.map(group => (
+            <List.Dropdown.Item 
+              key={group.id} 
+              value={`group-${group.id}`} 
+              title={`Group: ${group.name}`} 
+            />
+          ))}
         </List.Dropdown>
+      }
+
+      actions={
+        <ActionPanel>
+          <Action
+            title={onlyOpenTickets ? "Show All Tickets" : "Only Open Tickets"}
+            icon={onlyOpenTickets ? "❌" : "✅"}
+            onAction={() => handleOpenTicketsToggle(!onlyOpenTickets)}
+            shortcut={{ modifiers: ["cmd"], key: "o" }}
+          />
+        </ActionPanel>
       }
     >
       {tickets.map((t: Ticket) => (
