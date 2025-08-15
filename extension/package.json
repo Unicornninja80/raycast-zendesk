@@ -42,6 +42,7 @@
       "name": "enableSystemField",
       "type": "checkbox",
       "title": "Enable System Field",
+      "label": "Show System custom field in ticket editing",
       "description": "Show System custom field in ticket editing",
       "required": false,
       "default": true
@@ -58,6 +59,7 @@
       "name": "enableIssueField",
       "type": "checkbox",
       "title": "Enable Issue Field",
+      "label": "Show Issue custom field in ticket editing",
       "description": "Show Issue custom field in ticket editing",
       "required": false,
       "default": true

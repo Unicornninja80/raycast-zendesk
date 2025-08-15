@@ -1,14 +1,4 @@
-import {
-  Action,
-  ActionPanel,
-  Form,
-  List,
-  Detail,
-  showToast,
-  Toast,
-  getPreferenceValues,
-  popToRoot,
-} from "@raycast/api";
+import { Action, ActionPanel, Form, List, Detail, showToast, Toast, getPreferenceValues, popToRoot } from "@raycast/api";
 import React, { useEffect, useState } from "react";
 import { zdFetch, getAgentTicketUrl, getCurrentUserId, getAuthHeader } from "./zendesk";
 
@@ -111,7 +101,7 @@ export default function Tickets() {
 
   function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean) {
     const statusPart = openOnly ? "status:open" : "status<solved";
-
+    
     if (assignmentType === "me") {
       return `type:ticket assignee:me ${statusPart}`;
     } else if (assignmentType === "group" && groupId) {
@@ -139,6 +129,8 @@ export default function Tickets() {
     }
   }
 
+
+
   useEffect(() => {
     load(query);
   }, [query]);
@@ -148,14 +140,14 @@ export default function Tickets() {
   }, []);
 
   return (
-    <List
-      isLoading={loading}
-      searchBarPlaceholder="Search Zendesk…"
-      onSearchTextChange={setQuery}
+    <List 
+      isLoading={loading} 
+      searchBarPlaceholder="Search Zendesk…" 
+      onSearchTextChange={setQuery} 
       throttle
       searchBarAccessory={
-        <List.Dropdown
-          tooltip="Select Assignment"
+        <List.Dropdown 
+          tooltip="Select Assignment" 
           value={selectedGroupId ? `group-${selectedGroupId}` : "me"}
           onChange={(value) => {
             if (value === "me") {
@@ -167,11 +159,16 @@ export default function Tickets() {
           }}
         >
           <List.Dropdown.Item value="me" title="My Tickets" />
-          {groups.map((group) => (
-            <List.Dropdown.Item key={group.id} value={`group-${group.id}`} title={`Group: ${group.name}`} />
+          {groups.map(group => (
+            <List.Dropdown.Item 
+              key={group.id} 
+              value={`group-${group.id}`} 
+              title={`Group: ${group.name}`} 
+            />
           ))}
         </List.Dropdown>
       }
+
       actions={
         <ActionPanel>
           <Action
@@ -213,15 +210,15 @@ function ReplyForm({ ticketId }: { ticketId: number }) {
 
   async function uploadImage(file: File): Promise<string> {
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("filename", file.name);
+    formData.append('file', file);
+    formData.append('filename', file.name);
 
     // Use fetch directly instead of zdFetch for FormData uploads
     const { subdomain } = getPreferenceValues<{ subdomain: string; email: string; apiToken: string }>();
     const response = await fetch(`https://${subdomain}.zendesk.com/api/v2/uploads.json`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        Authorization: getAuthHeader(),
+        'Authorization': getAuthHeader(),
         // Don't set Content-Type - let browser set it with boundary for FormData
       },
       body: formData,
@@ -231,39 +228,39 @@ function ReplyForm({ ticketId }: { ticketId: number }) {
       throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
     }
 
-    const data = (await response.json()) as { upload: { token: string } };
+    const data = await response.json() as { upload: { token: string } };
     return data.upload.token;
   }
 
   async function handleFileSelection(filePaths: string[]) {
     if (filePaths.length === 0) return;
-
+    
     setUploading(true);
     const uploadPromises = filePaths.map(async (filePath) => {
       try {
         // Read file from filesystem
         const fileResponse = await fetch(`file://${filePath}`);
         const fileBlob = await fileResponse.blob();
-        const fileName = filePath.split("/").pop() || "image";
-
+        const fileName = filePath.split('/').pop() || 'image';
+        
         // Check if it's an image
-        if (!fileBlob.type.startsWith("image/")) {
-          await showToast({
-            style: Toast.Style.Failure,
-            title: "Invalid file type",
-            message: `${fileName} is not an image file`,
+        if (!fileBlob.type.startsWith('image/')) {
+          await showToast({ 
+            style: Toast.Style.Failure, 
+            title: "Invalid file type", 
+            message: `${fileName} is not an image file` 
           });
           return null;
         }
-
+        
         const file = new File([fileBlob], fileName, { type: fileBlob.type });
         const token = await uploadImage(file);
         return token;
-      } catch {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Failed to upload image",
-          message: `Could not upload ${filePath.split("/").pop()}`,
+      } catch (error) {
+        await showToast({ 
+          style: Toast.Style.Failure, 
+          title: "Failed to upload image", 
+          message: `Could not upload ${filePath.split('/').pop()}` 
         });
         return null;
       }
@@ -271,20 +268,20 @@ function ReplyForm({ ticketId }: { ticketId: number }) {
 
     try {
       const uploadedTokens = await Promise.all(uploadPromises);
-      const validTokens = uploadedTokens.filter((token) => token !== null) as string[];
-      setAttachments((prev) => [...prev, ...validTokens]);
-
+      const validTokens = uploadedTokens.filter(token => token !== null) as string[];
+      setAttachments(prev => [...prev, ...validTokens]);
+      
       if (validTokens.length > 0) {
-        await showToast({
-          style: Toast.Style.Success,
-          title: `${validTokens.length} image(s) uploaded`,
+        await showToast({ 
+          style: Toast.Style.Success, 
+          title: `${validTokens.length} image(s) uploaded` 
         });
       }
     } catch (error) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Upload failed",
-        message: String(error),
+      await showToast({ 
+        style: Toast.Style.Failure, 
+        title: "Upload failed", 
+        message: String(error) 
       });
     } finally {
       setUploading(false);
@@ -295,11 +292,11 @@ function ReplyForm({ ticketId }: { ticketId: number }) {
     if (!text.trim() && attachments.length === 0) return;
     await showToast({ style: Toast.Style.Animated, title: "Sending reply…" });
     try {
-      const comment: { body: string; public: boolean; uploads?: string[] } = {
-        body: text,
-        public: isPublic,
+      const comment: any = { 
+        body: text, 
+        public: isPublic 
       };
-
+      
       if (attachments.length > 0) {
         comment.uploads = attachments;
       }
@@ -349,9 +346,17 @@ function ReplyForm({ ticketId }: { ticketId: number }) {
         info="Click to select images or drag files onto Raycast"
       />
       {attachments.length > 0 && (
-        <Form.Description title="Uploaded Images" text={`${attachments.length} image(s) ready to attach`} />
+        <Form.Description 
+          title="Uploaded Images" 
+          text={`${attachments.length} image(s) ready to attach`} 
+        />
       )}
-      {uploading && <Form.Description title="Status" text="Uploading images..." />}
+      {uploading && (
+        <Form.Description 
+          title="Status" 
+          text="Uploading images..." 
+        />
+      )}
     </Form>
   );
 }
@@ -407,16 +412,16 @@ function TicketDetails({ ticketId }: { ticketId: number }) {
       const userIds = new Set([
         ticketResponse.ticket.requester_id,
         ...(ticketResponse.ticket.assignee_id ? [ticketResponse.ticket.assignee_id] : []),
-        ...commentsResponse.comments.map((c) => c.author_id),
+        ...commentsResponse.comments.map(c => c.author_id),
       ]);
 
       // Load user details
       if (userIds.size > 0) {
         const usersResponse = await zdFetch<UsersResponse>(
-          `/api/v2/users/show_many.json?ids=${Array.from(userIds).join(",")}`,
+          `/api/v2/users/show_many.json?ids=${Array.from(userIds).join(',')}`
         );
         const usersMap: Record<number, { name: string; email: string }> = {};
-        usersResponse.users.forEach((user) => {
+        usersResponse.users.forEach(user => {
           usersMap[user.id] = { name: user.name, email: user.email };
         });
         setUsers(usersMap);
@@ -433,9 +438,7 @@ function TicketDetails({ ticketId }: { ticketId: number }) {
   }
 
   const requesterName = users[ticket.requester_id]?.name || `User ${ticket.requester_id}`;
-  const assigneeName = ticket.assignee_id
-    ? users[ticket.assignee_id]?.name || `User ${ticket.assignee_id}`
-    : "Unassigned";
+  const assigneeName = ticket.assignee_id ? (users[ticket.assignee_id]?.name || `User ${ticket.assignee_id}`) : "Unassigned";
 
   const formatField = (field: string | null | undefined) => {
     if (!field) return "N/A";
@@ -462,20 +465,17 @@ ${ticket.description || "No description provided"}
 
 ## Comments
 
-${comments
-  .slice(1)
-  .map((comment) => {
-    const authorName = users[comment.author_id]?.name || `User ${comment.author_id}`;
-    const commentType = comment.public ? "Public" : "Internal";
-    return `
+${comments.slice(1).map(comment => {
+  const authorName = users[comment.author_id]?.name || `User ${comment.author_id}`;
+  const commentType = comment.public ? "Public" : "Internal";
+  return `
 ### ${authorName} • ${commentType} • ${new Date(comment.created_at).toLocaleString()}
 
 ${comment.body}
 
 ---
 `;
-  })
-  .join("")}
+}).join('')}
   `;
 
   return (
@@ -511,7 +511,7 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
   const [ticket, setTicket] = useState<FullTicket | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-
+  
   // Form states
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
@@ -521,10 +521,10 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
   const [issueFieldValue, setIssueFieldValue] = useState<string>("");
 
   const [systemOptions, setSystemOptions] = useState<{ value: string; label: string }[]>([
-    { value: "", label: "Select System..." },
+    { value: "", label: "Select System..." }
   ]);
   const [issueOptions, setIssueOptions] = useState<{ value: string; label: string }[]>([
-    { value: "", label: "Select Issue..." },
+    { value: "", label: "Select Issue..." }
   ]);
 
   const statusOptions = [
@@ -546,24 +546,24 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
     try {
       let allUsers: User[] = [];
       let nextPage = "/api/v2/users.json?role[]=agent&role[]=admin&per_page=100";
-
+      
       // Handle pagination to get all agents and admins
       while (nextPage) {
         const response = await zdFetch<{
           users: User[];
           next_page?: string;
         }>(nextPage);
-
+        
         allUsers = [...allUsers, ...response.users];
         nextPage = response.next_page || "";
-
+        
         // Prevent infinite loops - safety check
         if (allUsers.length > 1000) {
           console.warn("Too many users found, limiting to first 1000");
           break;
         }
       }
-
+      
       return { users: allUsers };
     } catch (e) {
       console.error("Failed to load agents:", e);
@@ -575,26 +575,24 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
   async function loadCustomFieldOptions() {
     try {
       // Load ticket fields to get custom field options
-      const fieldsResponse = await zdFetch<{
-        ticket_fields: Array<{
-          id: number;
-          title: string;
-          custom_field_options?: Array<{ name: string; value: string }>;
-        }>;
-      }>("/api/v2/ticket_fields.json");
+      const fieldsResponse = await zdFetch<{ ticket_fields: Array<{
+        id: number;
+        title: string;
+        custom_field_options?: Array<{ name: string; value: string }>;
+      }> }>("/api/v2/ticket_fields.json");
 
       // Load system field options
       if (preferences.enableSystemField && preferences.systemFieldId) {
-        const systemField = fieldsResponse.ticket_fields.find(
-          (field) => field.id === parseInt(preferences.systemFieldId!),
+        const systemField = fieldsResponse.ticket_fields.find(field => 
+          field.id === parseInt(preferences.systemFieldId!)
         );
         if (systemField?.custom_field_options) {
           const options = [
             { value: "", label: "Select System..." },
-            ...systemField.custom_field_options.map((option) => ({
+            ...systemField.custom_field_options.map(option => ({
               value: option.value,
-              label: option.name,
-            })),
+              label: option.name
+            }))
           ];
           setSystemOptions(options);
         }
@@ -602,16 +600,16 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
 
       // Load issue field options
       if (preferences.enableIssueField && preferences.issueFieldId) {
-        const issueField = fieldsResponse.ticket_fields.find(
-          (field) => field.id === parseInt(preferences.issueFieldId!),
+        const issueField = fieldsResponse.ticket_fields.find(field => 
+          field.id === parseInt(preferences.issueFieldId!)
         );
         if (issueField?.custom_field_options) {
           const options = [
             { value: "", label: "Select Issue..." },
-            ...issueField.custom_field_options.map((option) => ({
+            ...issueField.custom_field_options.map(option => ({
               value: option.value,
-              label: option.name,
-            })),
+              label: option.name
+            }))
           ];
           setIssueOptions(options);
         }
@@ -648,8 +646,8 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
       // Set custom field values
       if (ticketResponse.ticket.custom_fields) {
         if (preferences.enableSystemField && preferences.systemFieldId) {
-          const systemField = ticketResponse.ticket.custom_fields.find(
-            (cf) => cf.id === parseInt(preferences.systemFieldId!),
+          const systemField = ticketResponse.ticket.custom_fields.find(cf => 
+            cf.id === parseInt(preferences.systemFieldId!)
           );
           if (systemField?.value) {
             setSystemFieldValue(systemField.value.toString());
@@ -657,8 +655,8 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
         }
 
         if (preferences.enableIssueField && preferences.issueFieldId) {
-          const issueField = ticketResponse.ticket.custom_fields.find(
-            (cf) => cf.id === parseInt(preferences.issueFieldId!),
+          const issueField = ticketResponse.ticket.custom_fields.find(cf => 
+            cf.id === parseInt(preferences.issueFieldId!)
           );
           if (issueField?.value) {
             setIssueFieldValue(issueField.value.toString());
@@ -666,10 +664,10 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
         }
       }
     } catch (e) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to load ticket details",
-        message: String(e),
+      await showToast({ 
+        style: Toast.Style.Failure, 
+        title: "Failed to load ticket details", 
+        message: String(e) 
       });
     } finally {
       setLoading(false);
@@ -681,12 +679,7 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
     await showToast({ style: Toast.Style.Animated, title: "Updating ticket..." });
 
     try {
-      const updateData: {
-        status?: string;
-        assignee_id?: number | null;
-        group_id?: number | null;
-        custom_fields?: Array<{ id: number; value: string }>;
-      } = {};
+      const updateData: any = {};
 
       // Handle status change
       if (ticketStatus) {
@@ -707,13 +700,13 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
       if (preferences.enableSystemField && preferences.systemFieldId && systemFieldValue) {
         customFields.push({
           id: parseInt(preferences.systemFieldId),
-          value: systemFieldValue,
+          value: systemFieldValue
         });
       }
       if (preferences.enableIssueField && preferences.issueFieldId && issueFieldValue) {
         customFields.push({
           id: parseInt(preferences.issueFieldId),
-          value: issueFieldValue,
+          value: issueFieldValue
         });
       }
 
@@ -726,18 +719,18 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
         body: JSON.stringify({ ticket: updateData }),
       });
 
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Ticket updated successfully",
+      await showToast({ 
+        style: Toast.Style.Success, 
+        title: "Ticket updated successfully" 
       });
 
       // Navigate back
       popToRoot();
     } catch (e) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to update ticket",
-        message: String(e),
+      await showToast({ 
+        style: Toast.Style.Failure, 
+        title: "Failed to update ticket", 
+        message: String(e) 
       });
     } finally {
       setSaving(false);
@@ -748,7 +741,9 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
     return <Form isLoading={true} />;
   }
 
-  const agents = users.filter((user) => user.role === "agent" || user.role === "admin");
+  const agents = users.filter(user => 
+    user.role === 'agent' || user.role === 'admin'
+  );
 
   return (
     <Form
@@ -759,7 +754,10 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
         </ActionPanel>
       }
     >
-      <Form.Description title={`Edit Ticket #${ticketId}`} text={ticket.subject || "No subject"} />
+      <Form.Description 
+        title={`Edit Ticket #${ticketId}`} 
+        text={ticket.subject || "No subject"} 
+      />
 
       <Form.Separator />
 
@@ -770,8 +768,12 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
         onChange={setTicketStatus}
         info={`Current status: ${ticket.status || "Unknown"}`}
       >
-        {statusOptions.map((option) => (
-          <Form.Dropdown.Item key={option.value} value={option.value} title={option.label} />
+        {statusOptions.map(option => (
+          <Form.Dropdown.Item
+            key={option.value}
+            value={option.value}
+            title={option.label}
+          />
         ))}
       </Form.Dropdown>
 
@@ -788,24 +790,44 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
       </Form.Dropdown>
 
       {assignmentType === "user" && (
-        <Form.Dropdown id="assignee" title="Assignee" value={selectedAssigneeId} onChange={setSelectedAssigneeId}>
+        <Form.Dropdown
+          id="assignee"
+          title="Assignee"
+          value={selectedAssigneeId}
+          onChange={setSelectedAssigneeId}
+        >
           <Form.Dropdown.Item value="" title="Unassigned" />
-          {agents.map((user) => (
-            <Form.Dropdown.Item key={user.id} value={user.id.toString()} title={`${user.name} (${user.email})`} />
+          {agents.map(user => (
+            <Form.Dropdown.Item
+              key={user.id}
+              value={user.id.toString()}
+              title={`${user.name} (${user.email})`}
+            />
           ))}
         </Form.Dropdown>
       )}
 
       {assignmentType === "group" && (
-        <Form.Dropdown id="group" title="Group" value={selectedGroupId} onChange={setSelectedGroupId}>
+        <Form.Dropdown
+          id="group"
+          title="Group"
+          value={selectedGroupId}
+          onChange={setSelectedGroupId}
+        >
           <Form.Dropdown.Item value="" title="Select Group..." />
-          {groups.map((group) => (
-            <Form.Dropdown.Item key={group.id} value={group.id.toString()} title={group.name} />
+          {groups.map(group => (
+            <Form.Dropdown.Item
+              key={group.id}
+              value={group.id.toString()}
+              title={group.name}
+            />
           ))}
         </Form.Dropdown>
       )}
 
-      {(preferences.enableSystemField || preferences.enableIssueField) && <Form.Separator />}
+      {(preferences.enableSystemField || preferences.enableIssueField) && (
+        <Form.Separator />
+      )}
 
       {preferences.enableSystemField && (
         <Form.Dropdown
@@ -813,12 +835,14 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
           title="System"
           value={systemFieldValue}
           onChange={setSystemFieldValue}
-          info={
-            preferences.systemFieldId ? `Field ID: ${preferences.systemFieldId}` : "Configure field ID in preferences"
-          }
+          info={preferences.systemFieldId ? `Field ID: ${preferences.systemFieldId}` : "Configure field ID in preferences"}
         >
-          {systemOptions.map((option) => (
-            <Form.Dropdown.Item key={option.value} value={option.value} title={option.label} />
+          {systemOptions.map(option => (
+            <Form.Dropdown.Item
+              key={option.value}
+              value={option.value}
+              title={option.label}
+            />
           ))}
         </Form.Dropdown>
       )}
@@ -829,32 +853,30 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
           title="Issue"
           value={issueFieldValue}
           onChange={setIssueFieldValue}
-          info={
-            preferences.issueFieldId ? `Field ID: ${preferences.issueFieldId}` : "Configure field ID in preferences"
-          }
+          info={preferences.issueFieldId ? `Field ID: ${preferences.issueFieldId}` : "Configure field ID in preferences"}
         >
-          {issueOptions.map((option) => (
-            <Form.Dropdown.Item key={option.value} value={option.value} title={option.label} />
+          {issueOptions.map(option => (
+            <Form.Dropdown.Item
+              key={option.value}
+              value={option.value}
+              title={option.label}
+            />
           ))}
         </Form.Dropdown>
       )}
 
-      {(ticketStatus ||
-        selectedAssigneeId ||
-        selectedGroupId ||
-        (preferences.enableSystemField && systemFieldValue) ||
+      {(ticketStatus || selectedAssigneeId || selectedGroupId || 
+        (preferences.enableSystemField && systemFieldValue) || 
         (preferences.enableIssueField && issueFieldValue)) && (
         <>
           <Form.Separator />
-          <Form.Description
-            title="Changes Summary"
-            text={`${ticketStatus ? `Status: ${statusOptions.find((s) => s.value === ticketStatus)?.label}` : "Status: No change"}\n${
-              assignmentType === "user" && selectedAssigneeId
-                ? `Assign to: ${agents.find((u) => u.id.toString() === selectedAssigneeId)?.name}`
-                : assignmentType === "group" && selectedGroupId
-                  ? `Assign to group: ${groups.find((g) => g.id.toString() === selectedGroupId)?.name}`
-                  : "Assignment: No change"
-            }${preferences.enableSystemField && systemFieldValue ? `\nSystem: ${systemFieldValue}` : ""}${preferences.enableIssueField && issueFieldValue ? `\nIssue: ${issueFieldValue}` : ""}`}
+          <Form.Description 
+            title="Changes Summary" 
+            text={`${ticketStatus ? `Status: ${statusOptions.find(s => s.value === ticketStatus)?.label}` : "Status: No change"}\n${assignmentType === "user" && selectedAssigneeId ? 
+              `Assign to: ${agents.find(u => u.id.toString() === selectedAssigneeId)?.name}` : 
+              assignmentType === "group" && selectedGroupId ? 
+              `Assign to group: ${groups.find(g => g.id.toString() === selectedGroupId)?.name}` : 
+              "Assignment: No change"}${preferences.enableSystemField && systemFieldValue ? `\nSystem: ${systemFieldValue}` : ""}${preferences.enableIssueField && issueFieldValue ? `\nIssue: ${issueFieldValue}` : ""}`}
           />
         </>
       )}
