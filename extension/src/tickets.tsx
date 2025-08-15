@@ -542,6 +542,36 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
     loadCustomFieldOptions();
   }, [ticketId]);
 
+  async function loadAllAgents(): Promise<{ users: User[] }> {
+    try {
+      let allUsers: User[] = [];
+      let nextPage = "/api/v2/users.json?role[]=agent&role[]=admin&per_page=100";
+      
+      // Handle pagination to get all agents and admins
+      while (nextPage) {
+        const response = await zdFetch<{
+          users: User[];
+          next_page?: string;
+        }>(nextPage);
+        
+        allUsers = [...allUsers, ...response.users];
+        nextPage = response.next_page || "";
+        
+        // Prevent infinite loops - safety check
+        if (allUsers.length > 1000) {
+          console.warn("Too many users found, limiting to first 1000");
+          break;
+        }
+      }
+      
+      return { users: allUsers };
+    } catch (e) {
+      console.error("Failed to load agents:", e);
+      // Fallback to basic users endpoint if the filtered one fails
+      return await zdFetch<{ users: User[] }>("/api/v2/users.json");
+    }
+  }
+
   async function loadCustomFieldOptions() {
     try {
       // Load ticket fields to get custom field options
@@ -596,7 +626,7 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
       // Load ticket details, users, and groups in parallel
       const [ticketResponse, usersResponse, groupsResponse] = await Promise.all([
         zdFetch<TicketResponse>(`/api/v2/tickets/${ticketId}.json`),
-        zdFetch<{ users: User[] }>("/api/v2/users.json"),
+        loadAllAgents(),
         zdFetch<GroupsResponse>("/api/v2/groups.json"),
       ]);
 
