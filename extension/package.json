@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "zendesk",
-  "title": "Zendesk",
-  "description": "Work with tickets and Help Center",
+  "name": "zendesk-agent-toolkit",
+  "title": "Zendesk Agent Toolkit",
+  "description": "Complete Zendesk agent toolkit: manage tickets, reply with attachments, edit tickets, and create Help Center articles",
   "icon": "icon.png",
   "author": "justin_martin",
   "license": "MIT",
