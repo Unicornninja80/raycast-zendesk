@@ -520,23 +520,12 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
   const [systemFieldValue, setSystemFieldValue] = useState<string>("");
   const [issueFieldValue, setIssueFieldValue] = useState<string>("");
 
-  // System and Issue field options (you can customize these based on your Zendesk setup)
-  const systemOptions = [
-    { value: "", label: "Select System..." },
-    { value: "DataPoint", label: "DataPoint" },
-    { value: "WebPortal", label: "Web Portal" },
-    { value: "MobileApp", label: "Mobile App" },
-    { value: "API", label: "API" },
-  ];
-
-  const issueOptions = [
-    { value: "", label: "Select Issue..." },
-    { value: "000_Undefined", label: "000_Undefined" },
-    { value: "001_Login", label: "001_Login" },
-    { value: "002_Performance", label: "002_Performance" },
-    { value: "003_Bug", label: "003_Bug" },
-    { value: "004_Feature_Request", label: "004_Feature_Request" },
-  ];
+  const [systemOptions, setSystemOptions] = useState<{ value: string; label: string }[]>([
+    { value: "", label: "Select System..." }
+  ]);
+  const [issueOptions, setIssueOptions] = useState<{ value: string; label: string }[]>([
+    { value: "", label: "Select Issue..." }
+  ]);
 
   const statusOptions = [
     { value: "", label: "No Change" },
@@ -550,7 +539,56 @@ function EditTicketForm({ ticketId }: { ticketId: number }) {
 
   useEffect(() => {
     loadTicketAndUsers();
+    loadCustomFieldOptions();
   }, [ticketId]);
+
+  async function loadCustomFieldOptions() {
+    try {
+      // Load ticket fields to get custom field options
+      const fieldsResponse = await zdFetch<{ ticket_fields: Array<{
+        id: number;
+        title: string;
+        custom_field_options?: Array<{ name: string; value: string }>;
+      }> }>("/api/v2/ticket_fields.json");
+
+      // Load system field options
+      if (preferences.enableSystemField && preferences.systemFieldId) {
+        const systemField = fieldsResponse.ticket_fields.find(field => 
+          field.id === parseInt(preferences.systemFieldId!)
+        );
+        if (systemField?.custom_field_options) {
+          const options = [
+            { value: "", label: "Select System..." },
+            ...systemField.custom_field_options.map(option => ({
+              value: option.value,
+              label: option.name
+            }))
+          ];
+          setSystemOptions(options);
+        }
+      }
+
+      // Load issue field options
+      if (preferences.enableIssueField && preferences.issueFieldId) {
+        const issueField = fieldsResponse.ticket_fields.find(field => 
+          field.id === parseInt(preferences.issueFieldId!)
+        );
+        if (issueField?.custom_field_options) {
+          const options = [
+            { value: "", label: "Select Issue..." },
+            ...issueField.custom_field_options.map(option => ({
+              value: option.value,
+              label: option.name
+            }))
+          ];
+          setIssueOptions(options);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load custom field options:", e);
+      // Keep default options if loading fails
+    }
+  }
 
   async function loadTicketAndUsers() {
     setLoading(true);
