@@ -11,7 +11,7 @@ function getBaseUrl(): string {
   return `https://${subdomain}.zendesk.com`;
 }
 
-function getAuthHeader(): string {
+export function getAuthHeader(): string {
   const { email, apiToken } = getPreferenceValues<Preferences>();
   const token = Buffer.from(`${email}/token:${apiToken}`).toString("base64");
   return `Basic ${token}`;

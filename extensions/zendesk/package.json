@@ -49,9 +49,9 @@
     },
     {
       "name": "search-zendesk-support-center",
-      "title": "Help Center",
+      "title": "Search Articles",
       "subtitle": "Zendesk",
-      "description": "Search Help Center articles and create new articles from Markdown",
+      "description": "Search Help Center articles",
       "mode": "view"
     }
   ],
