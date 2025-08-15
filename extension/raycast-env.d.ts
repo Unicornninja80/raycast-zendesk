@@ -13,7 +13,15 @@ type ExtensionPreferences = {
   /** Agent Email - Your Zendesk agent email address */
   "email": string,
   /** API Token - Your Zendesk API token */
-  "apiToken": string
+  "apiToken": string,
+  /** Enable System Field - Show System custom field in ticket editing */
+  "enableSystemField": boolean,
+  /** System Field ID - Your Zendesk System custom field ID (find in admin settings) */
+  "systemFieldId"?: string,
+  /** Enable Issue Field - Show Issue custom field in ticket editing */
+  "enableIssueField": boolean,
+  /** Issue Field ID - Your Zendesk Issue custom field ID (find in admin settings) */
+  "issueFieldId"?: string
 }
 
 /** Preferences accessible in all the extension's commands */

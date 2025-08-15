@@ -328,13 +328,14 @@ function CreateArticleForm() {
       
       <Form.FilePicker
         id="markdown"
-        title="Markdown File"
+        title="📄 Markdown File"
         allowMultipleSelection={false}
         value={[]}
         onChange={handleMarkdownUpload}
         canChooseDirectories={false}
         canChooseFiles={true}
         showHiddenFiles={false}
+        info="Click to select .md file or drag onto Raycast"
       />
 
       <Form.TextField

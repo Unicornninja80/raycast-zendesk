@@ -37,6 +37,38 @@
       "description": "Your Zendesk API token",
       "required": true,
       "placeholder": "Enter your API token"
+    },
+    {
+      "name": "enableSystemField",
+      "type": "checkbox",
+      "title": "Enable System Field",
+      "description": "Show System custom field in ticket editing",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "systemFieldId",
+      "type": "textfield",
+      "title": "System Field ID",
+      "description": "Your Zendesk System custom field ID (find in admin settings)",
+      "required": false,
+      "placeholder": "123456"
+    },
+    {
+      "name": "enableIssueField",
+      "type": "checkbox",
+      "title": "Enable Issue Field",
+      "description": "Show Issue custom field in ticket editing",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "issueFieldId",
+      "type": "textfield",
+      "title": "Issue Field ID",
+      "description": "Your Zendesk Issue custom field ID (find in admin settings)",
+      "required": false,
+      "placeholder": "123457"
     }
   ],
   "commands": [

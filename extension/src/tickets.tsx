@@ -20,6 +20,19 @@ interface FullTicket {
   priority: string | null;
   requester_id: number;
   assignee_id?: number | null;
+  custom_fields?: CustomField[];
+}
+
+interface CustomField {
+  id: number;
+  value: string | number | null;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
 }
 
 interface Comment {
@@ -143,6 +156,7 @@ export default function Tickets() {
               <Action.Push title="View Details" target={<TicketDetails ticketId={t.id} />} />
               <Action.OpenInBrowser url={getAgentTicketUrl(t.id)} />
               <Action.Push title="Reply…" target={<ReplyForm ticketId={t.id} />} />
+              <Action.Push title="Edit Ticket" target={<EditTicketForm ticketId={t.id} />} />
               <Action title="Assign to Me" onAction={() => assignToMe(t.id)} />
               <Action title="Mark as Solved" onAction={() => updateStatus(t.id, "solved")} />
               <Action title="Mark as Pending" onAction={() => updateStatus(t.id, "pending")} />
@@ -288,13 +302,14 @@ function ReplyForm({ ticketId }: { ticketId: number }) {
       />
       <Form.FilePicker
         id="images"
-        title="Attachments"
+        title="📎 Image Attachments"
         allowMultipleSelection={true}
         value={[]}
         onChange={handleFileSelection}
         canChooseDirectories={false}
         canChooseFiles={true}
         showHiddenFiles={false}
+        info="Click to select images or drag files onto Raycast"
       />
       {attachments.length > 0 && (
         <Form.Description 
@@ -436,11 +451,333 @@ ${comment.body}
         <ActionPanel>
           <Action.OpenInBrowser url={getAgentTicketUrl(ticketId)} />
           <Action.Push title="Reply…" target={<ReplyForm ticketId={ticketId} />} />
+          <Action.Push title="Edit Ticket" target={<EditTicketForm ticketId={ticketId} />} />
           <Action title="Assign to Me" onAction={() => assignToMe(ticketId)} />
           <Action title="Mark as Solved" onAction={() => updateStatus(ticketId, "solved")} />
           <Action title="Mark as Pending" onAction={() => updateStatus(ticketId, "pending")} />
         </ActionPanel>
       }
     />
+  );
+}
+
+function EditTicketForm({ ticketId }: { ticketId: number }) {
+  const preferences = getPreferenceValues<{
+    subdomain: string;
+    email: string;
+    apiToken: string;
+    enableSystemField?: boolean;
+    systemFieldId?: string;
+    enableIssueField?: boolean;
+    issueFieldId?: string;
+  }>();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [ticket, setTicket] = useState<FullTicket | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  
+  // Form states
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [assignmentType, setAssignmentType] = useState<"user" | "group">("user");
+  const [ticketStatus, setTicketStatus] = useState<string>("");
+  const [systemFieldValue, setSystemFieldValue] = useState<string>("");
+  const [issueFieldValue, setIssueFieldValue] = useState<string>("");
+
+  // System and Issue field options (you can customize these based on your Zendesk setup)
+  const systemOptions = [
+    { value: "", label: "Select System..." },
+    { value: "DataPoint", label: "DataPoint" },
+    { value: "WebPortal", label: "Web Portal" },
+    { value: "MobileApp", label: "Mobile App" },
+    { value: "API", label: "API" },
+  ];
+
+  const issueOptions = [
+    { value: "", label: "Select Issue..." },
+    { value: "000_Undefined", label: "000_Undefined" },
+    { value: "001_Login", label: "001_Login" },
+    { value: "002_Performance", label: "002_Performance" },
+    { value: "003_Bug", label: "003_Bug" },
+    { value: "004_Feature_Request", label: "004_Feature_Request" },
+  ];
+
+  const statusOptions = [
+    { value: "", label: "No Change" },
+    { value: "new", label: "New" },
+    { value: "open", label: "Open" },
+    { value: "pending", label: "Pending" },
+    { value: "hold", label: "On Hold" },
+    { value: "solved", label: "Solved" },
+    { value: "closed", label: "Closed" },
+  ];
+
+  useEffect(() => {
+    loadTicketAndUsers();
+  }, [ticketId]);
+
+  async function loadTicketAndUsers() {
+    setLoading(true);
+    try {
+      // Load ticket details, users, and groups in parallel
+      const [ticketResponse, usersResponse, groupsResponse] = await Promise.all([
+        zdFetch<TicketResponse>(`/api/v2/tickets/${ticketId}.json`),
+        zdFetch<{ users: User[] }>("/api/v2/users.json"),
+        zdFetch<GroupsResponse>("/api/v2/groups.json"),
+      ]);
+
+      setTicket(ticketResponse.ticket);
+      setUsers(usersResponse.users);
+      setGroups(groupsResponse.groups);
+
+      // Set current values
+      if (ticketResponse.ticket.assignee_id) {
+        setSelectedAssigneeId(ticketResponse.ticket.assignee_id.toString());
+        setAssignmentType("user");
+      }
+
+      // Set current status (but leave dropdown empty for "no change" by default)
+      // setTicketStatus(ticketResponse.ticket.status || "");
+
+      // Set custom field values
+      if (ticketResponse.ticket.custom_fields) {
+        if (preferences.enableSystemField && preferences.systemFieldId) {
+          const systemField = ticketResponse.ticket.custom_fields.find(cf => 
+            cf.id === parseInt(preferences.systemFieldId!)
+          );
+          if (systemField?.value) {
+            setSystemFieldValue(systemField.value.toString());
+          }
+        }
+
+        if (preferences.enableIssueField && preferences.issueFieldId) {
+          const issueField = ticketResponse.ticket.custom_fields.find(cf => 
+            cf.id === parseInt(preferences.issueFieldId!)
+          );
+          if (issueField?.value) {
+            setIssueFieldValue(issueField.value.toString());
+          }
+        }
+      }
+    } catch (e) {
+      await showToast({ 
+        style: Toast.Style.Failure, 
+        title: "Failed to load ticket details", 
+        message: String(e) 
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateTicket() {
+    setSaving(true);
+    await showToast({ style: Toast.Style.Animated, title: "Updating ticket..." });
+
+    try {
+      const updateData: any = {};
+
+      // Handle status change
+      if (ticketStatus) {
+        updateData.status = ticketStatus;
+      }
+
+      // Handle assignment
+      if (assignmentType === "user" && selectedAssigneeId) {
+        updateData.assignee_id = parseInt(selectedAssigneeId);
+        updateData.group_id = null; // Clear group assignment when assigning to user
+      } else if (assignmentType === "group" && selectedGroupId) {
+        updateData.group_id = parseInt(selectedGroupId);
+        updateData.assignee_id = null; // Clear user assignment when assigning to group
+      }
+
+      // Handle custom fields
+      const customFields = [];
+      if (preferences.enableSystemField && preferences.systemFieldId && systemFieldValue) {
+        customFields.push({
+          id: parseInt(preferences.systemFieldId),
+          value: systemFieldValue
+        });
+      }
+      if (preferences.enableIssueField && preferences.issueFieldId && issueFieldValue) {
+        customFields.push({
+          id: parseInt(preferences.issueFieldId),
+          value: issueFieldValue
+        });
+      }
+
+      if (customFields.length > 0) {
+        updateData.custom_fields = customFields;
+      }
+
+      await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
+        method: "PUT",
+        body: JSON.stringify({ ticket: updateData }),
+      });
+
+      await showToast({ 
+        style: Toast.Style.Success, 
+        title: "Ticket updated successfully" 
+      });
+
+      // Navigate back
+      popToRoot();
+    } catch (e) {
+      await showToast({ 
+        style: Toast.Style.Failure, 
+        title: "Failed to update ticket", 
+        message: String(e) 
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading || !ticket) {
+    return <Form isLoading={true} />;
+  }
+
+  const agents = users.filter(user => 
+    user.role === 'agent' || user.role === 'admin'
+  );
+
+  return (
+    <Form
+      isLoading={saving}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Update Ticket" onSubmit={updateTicket} />
+        </ActionPanel>
+      }
+    >
+      <Form.Description 
+        title={`Edit Ticket #${ticketId}`} 
+        text={ticket.subject || "No subject"} 
+      />
+
+      <Form.Separator />
+
+      <Form.Dropdown
+        id="status"
+        title="Ticket Status"
+        value={ticketStatus}
+        onChange={setTicketStatus}
+        info={`Current status: ${ticket.status || "Unknown"}`}
+      >
+        {statusOptions.map(option => (
+          <Form.Dropdown.Item
+            key={option.value}
+            value={option.value}
+            title={option.label}
+          />
+        ))}
+      </Form.Dropdown>
+
+      <Form.Separator />
+
+      <Form.Dropdown
+        id="assignmentType"
+        title="Assignment Type"
+        value={assignmentType}
+        onChange={(value) => setAssignmentType(value as "user" | "group")}
+      >
+        <Form.Dropdown.Item value="user" title="Assign to User" />
+        <Form.Dropdown.Item value="group" title="Assign to Group" />
+      </Form.Dropdown>
+
+      {assignmentType === "user" && (
+        <Form.Dropdown
+          id="assignee"
+          title="Assignee"
+          value={selectedAssigneeId}
+          onChange={setSelectedAssigneeId}
+        >
+          <Form.Dropdown.Item value="" title="Unassigned" />
+          {agents.map(user => (
+            <Form.Dropdown.Item
+              key={user.id}
+              value={user.id.toString()}
+              title={`${user.name} (${user.email})`}
+            />
+          ))}
+        </Form.Dropdown>
+      )}
+
+      {assignmentType === "group" && (
+        <Form.Dropdown
+          id="group"
+          title="Group"
+          value={selectedGroupId}
+          onChange={setSelectedGroupId}
+        >
+          <Form.Dropdown.Item value="" title="Select Group..." />
+          {groups.map(group => (
+            <Form.Dropdown.Item
+              key={group.id}
+              value={group.id.toString()}
+              title={group.name}
+            />
+          ))}
+        </Form.Dropdown>
+      )}
+
+      {(preferences.enableSystemField || preferences.enableIssueField) && (
+        <Form.Separator />
+      )}
+
+      {preferences.enableSystemField && (
+        <Form.Dropdown
+          id="system"
+          title="System"
+          value={systemFieldValue}
+          onChange={setSystemFieldValue}
+          info={preferences.systemFieldId ? `Field ID: ${preferences.systemFieldId}` : "Configure field ID in preferences"}
+        >
+          {systemOptions.map(option => (
+            <Form.Dropdown.Item
+              key={option.value}
+              value={option.value}
+              title={option.label}
+            />
+          ))}
+        </Form.Dropdown>
+      )}
+
+      {preferences.enableIssueField && (
+        <Form.Dropdown
+          id="issue"
+          title="Issue"
+          value={issueFieldValue}
+          onChange={setIssueFieldValue}
+          info={preferences.issueFieldId ? `Field ID: ${preferences.issueFieldId}` : "Configure field ID in preferences"}
+        >
+          {issueOptions.map(option => (
+            <Form.Dropdown.Item
+              key={option.value}
+              value={option.value}
+              title={option.label}
+            />
+          ))}
+        </Form.Dropdown>
+      )}
+
+      {(ticketStatus || selectedAssigneeId || selectedGroupId || 
+        (preferences.enableSystemField && systemFieldValue) || 
+        (preferences.enableIssueField && issueFieldValue)) && (
+        <>
+          <Form.Separator />
+          <Form.Description 
+            title="Changes Summary" 
+            text={`${ticketStatus ? `Status: ${statusOptions.find(s => s.value === ticketStatus)?.label}` : "Status: No change"}\n${assignmentType === "user" && selectedAssigneeId ? 
+              `Assign to: ${agents.find(u => u.id.toString() === selectedAssigneeId)?.name}` : 
+              assignmentType === "group" && selectedGroupId ? 
+              `Assign to group: ${groups.find(g => g.id.toString() === selectedGroupId)?.name}` : 
+              "Assignment: No change"}${preferences.enableSystemField && systemFieldValue ? `\nSystem: ${systemFieldValue}` : ""}${preferences.enableIssueField && issueFieldValue ? `\nIssue: ${issueFieldValue}` : ""}`}
+          />
+        </>
+      )}
+    </Form>
   );
 }
