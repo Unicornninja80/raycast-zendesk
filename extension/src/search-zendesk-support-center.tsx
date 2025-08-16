@@ -9,20 +9,28 @@ interface Article {
   title: string;
   html_url: string;
   updated_at: string;
+  section_id: number;
 }
+
 interface ArticleSearch {
   results: Article[];
+}
+
+interface ArticlesResponse {
+  articles: Article[];
 }
 
 interface Section {
   id: number;
   name: string;
   category_id: number;
+  description?: string;
 }
 
 interface Category {
   id: number;
   name: string;
+  description?: string;
 }
 
 interface SectionsResponse {
@@ -33,18 +41,92 @@ interface CategoriesResponse {
   categories: Category[];
 }
 
-export default function Articles() {
-  const [loading, setLoading] = useState(false);
-  const [articles, setArticles] = useState<Article[]>([]);
+type ViewType = 'categories' | 'sections' | 'articles' | 'search';
 
-  async function search(q: string) {
-    if (!q) return;
+export default function HelpCenter() {
+  const [loading, setLoading] = useState(false);
+  const [viewType, setViewType] = useState<ViewType>('categories');
+  const [searchMode, setSearchMode] = useState(false);
+  
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [searchResults, setSearchResults] = useState<Article[]>([]);
+  
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedSection, setSelectedSection] = useState<Section | null>(null);
+
+  useEffect(() => {
+    if (!searchMode) {
+      loadCategories();
+    }
+  }, [searchMode]);
+
+  async function loadCategories() {
+    setLoading(true);
+    try {
+      const data = await zdFetch<CategoriesResponse>("/api/v2/help_center/categories.json");
+      setCategories(data.categories);
+      setViewType('categories');
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load categories",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadSections(category: Category) {
+    setLoading(true);
+    try {
+      const data = await zdFetch<SectionsResponse>(`/api/v2/help_center/categories/${category.id}/sections.json`);
+      setSections(data.sections);
+      setSelectedCategory(category);
+      setViewType('sections');
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load sections",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadArticles(section: Section) {
+    setLoading(true);
+    try {
+      const data = await zdFetch<ArticlesResponse>(`/api/v2/help_center/en-us/sections/${section.id}/articles.json`);
+      setArticles(data.articles);
+      setSelectedSection(section);
+      setViewType('articles');
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load articles",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function searchArticles(q: string) {
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
     setLoading(true);
     try {
       const res = await zdFetch<ArticleSearch>(
         `/api/v2/help_center/articles/search.json?query=${encodeURIComponent(q)}`,
       );
-      setArticles(res.results);
+      setSearchResults(res.results);
+      setViewType('search');
     } catch (e) {
       await showToast({ style: Toast.Style.Failure, title: "Failed to search articles", message: String(e) });
     } finally {
@@ -52,32 +134,168 @@ export default function Articles() {
     }
   }
 
-  useEffect(() => {
-    search("getting started");
-  }, []);
+  function getNavigationTitle() {
+    if (searchMode) return "Search Results";
+    if (viewType === 'categories') return "Help Center";
+    if (viewType === 'sections') return selectedCategory?.name || "Sections";
+    if (viewType === 'articles') return selectedSection?.name || "Articles";
+    return "Help Center";
+  }
 
+  function getBackAction() {
+    if (searchMode) {
+      return (
+        <Action
+          title="Back to Categories"
+          onAction={() => {
+            setSearchMode(false);
+            setViewType('categories');
+          }}
+        />
+      );
+    }
+    
+    if (viewType === 'articles') {
+      return (
+        <Action
+          title="Back to Sections"
+          onAction={() => {
+            setViewType('sections');
+          }}
+        />
+      );
+    }
+    
+    if (viewType === 'sections') {
+      return (
+        <Action
+          title="Back to Categories"
+          onAction={() => {
+            setViewType('categories');
+          }}
+        />
+      );
+    }
+    
+    return null;
+  }
+
+  const commonActions = (
+    <>
+      {getBackAction()}
+      <Action.Push title="Create Article from Markdown" target={<CreateArticleForm />} />
+      <Action
+        title={searchMode ? "Browse Categories" : "Search Articles"}
+        onAction={() => setSearchMode(!searchMode)}
+      />
+    </>
+  );
+
+  // Search mode
+  if (searchMode) {
+    return (
+      <List
+        isLoading={loading}
+        onSearchTextChange={searchArticles}
+        throttle
+        searchBarPlaceholder="Search all articles..."
+        navigationTitle={getNavigationTitle()}
+        actions={<ActionPanel>{commonActions}</ActionPanel>}
+      >
+        {searchResults.map((article) => (
+          <List.Item
+            key={article.id}
+            title={article.title}
+            accessories={[{ date: new Date(article.updated_at) }]}
+            actions={
+              <ActionPanel>
+                <Action.OpenInBrowser url={article.html_url} />
+                <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
+                {commonActions}
+              </ActionPanel>
+            }
+          />
+        ))}
+      </List>
+    );
+  }
+
+  // Categories view
+  if (viewType === 'categories') {
+    return (
+      <List
+        isLoading={loading}
+        navigationTitle={getNavigationTitle()}
+        actions={<ActionPanel>{commonActions}</ActionPanel>}
+      >
+        {categories.map((category) => (
+          <List.Item
+            key={category.id}
+            title={category.name}
+            subtitle={category.description}
+            icon="📁"
+            actions={
+              <ActionPanel>
+                <Action
+                  title="View Sections"
+                  onAction={() => loadSections(category)}
+                />
+                {commonActions}
+              </ActionPanel>
+            }
+          />
+        ))}
+      </List>
+    );
+  }
+
+  // Sections view
+  if (viewType === 'sections') {
+    return (
+      <List
+        isLoading={loading}
+        navigationTitle={getNavigationTitle()}
+        actions={<ActionPanel>{commonActions}</ActionPanel>}
+      >
+        {sections.map((section) => (
+          <List.Item
+            key={section.id}
+            title={section.name}
+            subtitle={section.description}
+            icon="📂"
+            actions={
+              <ActionPanel>
+                <Action
+                  title="View Articles"
+                  onAction={() => loadArticles(section)}
+                />
+                {commonActions}
+              </ActionPanel>
+            }
+          />
+        ))}
+      </List>
+    );
+  }
+
+  // Articles view
   return (
     <List
       isLoading={loading}
-      onSearchTextChange={search}
-      throttle
-      searchBarPlaceholder="Search Help Center…"
-      actions={
-        <ActionPanel>
-          <Action.Push title="Create Article from Markdown" target={<CreateArticleForm />} />
-        </ActionPanel>
-      }
+      navigationTitle={getNavigationTitle()}
+      actions={<ActionPanel>{commonActions}</ActionPanel>}
     >
-      {articles.map((a: Article) => (
+      {articles.map((article) => (
         <List.Item
-          key={a.id}
-          title={a.title}
-          accessories={[{ date: new Date(a.updated_at) }]}
+          key={article.id}
+          title={article.title}
+          accessories={[{ date: new Date(article.updated_at) }]}
+          icon="📄"
           actions={
             <ActionPanel>
-              <Action.OpenInBrowser url={a.html_url} />
-              <Action.CopyToClipboard title="Copy Article URL" content={a.html_url} />
-              <Action.Push title="Create Article from Markdown" target={<CreateArticleForm />} />
+              <Action.OpenInBrowser url={article.html_url} />
+              <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
+              {commonActions}
             </ActionPanel>
           }
         />
@@ -148,137 +366,105 @@ function CreateArticleForm() {
   async function handleMarkdownUpload(filePaths: string[]) {
     if (filePaths.length === 0) return;
 
-    const filePath = filePaths[0];
-    const fileName = filePath.split("/").pop() || "article";
-
     try {
-      // Check if it's a markdown file
-      if (!fileName.toLowerCase().endsWith(".md") && !fileName.toLowerCase().endsWith(".markdown")) {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Invalid file type",
-          message: "Please select a Markdown file (.md or .markdown)",
-        });
-        return;
-      }
-
-      // Read file content using Node.js fs
+      const filePath = filePaths[0];
       const content = readFileSync(filePath, "utf8");
-
-      // Extract title from filename or first H1
-      const firstLine = content.split("\n")[0];
-      const extractedTitle = firstLine.startsWith("# ")
-        ? firstLine.substring(2).trim()
-        : fileName.replace(/\.(md|markdown)$/i, "");
-
-      setTitle(extractedTitle);
       setMarkdownContent(content);
       setFileLoaded(true);
 
+      // Extract title from filename if title is empty
+      if (!title) {
+        const fileName = filePath.split("/").pop() || "";
+        const titleFromFile = fileName.replace(/\.(md|txt)$/i, "").replace(/[-_]/g, " ");
+        setTitle(titleFromFile);
+      }
+
       await showToast({
         style: Toast.Style.Success,
-        title: "Markdown file loaded",
-        message: `Loaded: ${fileName}`,
+        title: "File loaded successfully",
+        message: `Loaded ${filePath}`,
       });
-    } catch (error) {
+    } catch (e) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to load file",
-        message: `Could not read file: ${String(error)}`,
+        message: String(e),
       });
     }
   }
 
-  function convertMarkdownToHTML(markdown: string): string {
+  function convertMarkdownToHtml(markdown: string): string {
     // Basic markdown to HTML conversion
-    // This is a simple implementation - for production, consider using a library like marked
     let html = markdown
       // Headers
-      .replace(/^### (.*$)/gim, "<h3>$1</h3>")
-      .replace(/^## (.*$)/gim, "<h2>$1</h2>")
-      .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-      // Bold
-      .replace(/\*\*(.*)\*\*/gim, "<strong>$1</strong>")
-      .replace(/__(.*?)__/gim, "<strong>$1</strong>")
-      // Italic
-      .replace(/\*(.*)\*/gim, "<em>$1</em>")
-      .replace(/_(.*?)_/gim, "<em>$1</em>")
+      .replace(/^### (.*)/gm, "<h3>$1</h3>")
+      .replace(/^## (.*)/gm, "<h2>$1</h2>")
+      .replace(/^# (.*)/gm, "<h1>$1</h1>")
+      // Bold and italic
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
       // Code blocks
-      .replace(/```([\s\S]*?)```/gim, "<pre><code>$1</code></pre>")
-      // Inline code
-      .replace(/`([^`]*)`/gim, "<code>$1</code>")
+      .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+      .replace(/`(.*?)`/g, "<code>$1</code>")
       // Links
-      .replace(/\[([^\]]*)\]\(([^)]*)\)/gim, '<a href="$2">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
       // Line breaks
-      .replace(/\n$/gim, "<br>")
-      .replace(/\n/gim, "<br>\n")
-      // Lists (basic)
-      .replace(/^\* (.*$)/gim, "<li>$1</li>")
-      .replace(/^- (.*$)/gim, "<li>$1</li>")
-      .replace(/^\d+\. (.*$)/gim, "<li>$1</li>");
+      .replace(/\n\n/g, "</p><p>")
+      .replace(/\n/g, "<br>");
 
-    // Wrap consecutive <li> elements in <ul>
-    html = html.replace(/(<li>.*<\/li>)/s, "<ul>$1</ul>");
+    // Wrap in paragraphs if not already wrapped
+    if (!html.includes("<p>") && !html.includes("<h")) {
+      html = `<p>${html}</p>`;
+    }
 
     return html;
   }
 
-  async function createArticle() {
-    if (!title.trim() || !markdownContent.trim() || !selectedCategoryId || !selectedSectionId) {
+  async function handleSubmit() {
+    if (!title || !markdownContent || !selectedSectionId) {
       await showToast({
         style: Toast.Style.Failure,
-        title: "Missing required fields",
-        message: "Please provide title, content, select a category and section",
+        title: "Missing fields",
+        message: "Please fill in all required fields",
       });
       return;
     }
 
     setLoading(true);
-    await showToast({ style: Toast.Style.Animated, title: "Creating article..." });
 
     try {
-      const htmlContent = convertMarkdownToHTML(markdownContent);
+      const htmlContent = convertMarkdownToHtml(markdownContent);
 
-      // Match the working Python structure
       const articleData = {
         article: {
-          title: title,
+          title,
           body: htmlContent,
-          locale: "en-us",
-          permission_group_id: 1882214, // Using the same ID from your working Python app
-          user_segment_id: isPublic ? null : 933727, // null = everyone, 933727 = agents/admins
+          draft: !isPublic,
+          promoted: false,
+          section_id: parseInt(selectedSectionId),
         },
-        notify_subscribers: false,
       };
 
-      const response = await zdFetch<{ article: Article }>(
-        `/api/v2/help_center/en-us/sections/${selectedSectionId}/articles.json`,
-        {
-          method: "POST",
-          body: JSON.stringify(articleData),
+      const response = await zdFetch(`/api/v2/help_center/sections/${selectedSectionId}/articles.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(articleData),
+      });
 
       await showToast({
         style: Toast.Style.Success,
-        title: "Article created successfully!",
-        message: `Article ID: ${response.article.id} (${isPublic ? "Published" : "Draft - Set permissions in Zendesk"})`,
+        title: "Article created successfully",
+        message: `Article "${title}" has been created`,
       });
 
-      // Clear form
-      setTitle("");
-      setMarkdownContent("");
-      setFileLoaded(false);
-      setIsPublic(true); // Reset to public by default
-      // Keep category/section selections for convenience
-
-      // Navigate back to article list
       popToRoot();
-    } catch (error) {
+    } catch (e) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to create article",
-        message: String(error),
+        message: String(e),
       });
     } finally {
       setLoading(false);
@@ -290,41 +476,35 @@ function CreateArticleForm() {
       isLoading={loading}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Create Article" onSubmit={createArticle} />
+          <Action.SubmitForm title="Create Article" onSubmit={handleSubmit} />
         </ActionPanel>
       }
     >
-      <Form.Description title="Create Help Center Article" text="Upload a Markdown file to create a new article" />
+      <Form.TextField id="title" title="Article Title" placeholder="Enter article title" value={title} onChange={setTitle} />
 
       <Form.FilePicker
-        id="markdown"
-        title="📄 Markdown File"
+        id="markdownFile"
+        title="Markdown File"
         allowMultipleSelection={false}
-        value={[]}
-        onChange={handleMarkdownUpload}
         canChooseDirectories={false}
         canChooseFiles={true}
-        showHiddenFiles={false}
-        info="Click to select .md file or drag onto Raycast"
+        onChange={handleMarkdownUpload}
       />
 
-      <Form.TextField
-        id="title"
-        title="Article Title"
-        value={title}
-        onChange={setTitle}
-        placeholder="Enter article title..."
+      <Form.TextArea
+        id="content"
+        title="Content (Markdown)"
+        placeholder="Paste or type your markdown content here..."
+        value={markdownContent}
+        onChange={setMarkdownContent}
       />
 
-      <Form.Checkbox
-        id="visibility"
-        label="Publish Article"
-        value={isPublic}
-        onChange={setIsPublic}
-        info="When checked, article will be published immediately. When unchecked, article will be saved as a draft for you to set permissions manually in Zendesk."
-      />
-
-      <Form.Dropdown id="category" title="Category" value={selectedCategoryId} onChange={setSelectedCategoryId}>
+      <Form.Dropdown
+        id="category"
+        title="Category"
+        value={selectedCategoryId}
+        onChange={setSelectedCategoryId}
+      >
         {categories.map((category) => (
           <Form.Dropdown.Item key={category.id} value={category.id.toString()} title={category.name} />
         ))}
@@ -340,46 +520,17 @@ function CreateArticleForm() {
         {sections.map((section) => (
           <Form.Dropdown.Item key={section.id} value={section.id.toString()} title={section.name} />
         ))}
-        {sections.length === 0 && selectedCategoryId && (
-          <Form.Dropdown.Item value="" title="No sections available in this category" />
-        )}
       </Form.Dropdown>
 
-      <Form.TextArea
-        id="content"
-        title="Markdown Content"
-        value={markdownContent}
-        onChange={setMarkdownContent}
-        placeholder="Markdown content will appear here after file upload, or you can type directly..."
-        enableMarkdown={true}
+      <Form.Checkbox
+        id="isPublic"
+        title="Publish Article"
+        label="Make article public immediately"
+        value={isPublic}
+        onChange={setIsPublic}
       />
 
-      {fileLoaded && markdownContent && (
-        <Form.Description
-          title="File Status"
-          text={`✅ Markdown file loaded (${markdownContent.split("\n").length} lines)`}
-        />
-      )}
-
-      {title && <Form.Description title="Extracted Title" text={`📄 Title: "${title}"`} />}
-
-      <Form.Description
-        title="Article Status"
-        text={`${isPublic ? "✅ Will be published immediately" : "📝 Will be saved as draft (set permissions in Zendesk)"}`}
-      />
-
-      {markdownContent && <Form.Separator />}
-
-      {markdownContent && (
-        <Form.Description
-          title="HTML Preview"
-          text={`The markdown will be converted to HTML. First 200 characters:\n\n${convertMarkdownToHTML(
-            markdownContent,
-          )
-            .substring(0, 200)
-            .replace(/<[^>]*>/g, "")}${markdownContent.length > 200 ? "..." : ""}`}
-        />
-      )}
+      <Form.Description text="Upload a markdown file or paste content directly. The article will be converted to HTML automatically." />
     </Form>
   );
 }
