@@ -209,6 +209,7 @@ export default function HelpCenter() {
             accessories={[{ date: new Date(article.updated_at) }]}
             actions={
               <ActionPanel>
+                <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} />} />
                 <Action.OpenInBrowser url={article.html_url} />
                 <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
                 {commonActions}
@@ -293,6 +294,7 @@ export default function HelpCenter() {
           icon="📄"
           actions={
             <ActionPanel>
+              <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} />} />
               <Action.OpenInBrowser url={article.html_url} />
               <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
               {commonActions}
@@ -531,6 +533,251 @@ function CreateArticleForm() {
       />
 
       <Form.Description text="Upload a markdown file or paste content directly. The article will be converted to HTML automatically." />
+    </Form>
+  );
+}
+
+function EditArticleForm({ articleId }: { articleId: number }) {
+  const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState("");
+  const [markdownContent, setMarkdownContent] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedSectionId, setSelectedSectionId] = useState<string>("");
+  const [isPublic, setIsPublic] = useState(true);
+
+  useEffect(() => {
+    loadArticleData();
+    loadCategories();
+  }, [articleId]);
+
+  useEffect(() => {
+    if (selectedCategoryId) {
+      loadSections(selectedCategoryId);
+    } else {
+      setSections([]);
+      setSelectedSectionId("");
+    }
+  }, [selectedCategoryId]);
+
+  async function loadArticleData() {
+    setLoading(true);
+    try {
+      const response = await zdFetch<{ article: { id: number; title: string; body: string; section_id: number; draft: boolean } }>(
+        `/api/v2/help_center/articles/${articleId}.json`
+      );
+      
+      const article = response.article;
+      setTitle(article.title);
+      setSelectedSectionId(article.section_id.toString());
+      setIsPublic(!article.draft);
+      
+      // Convert HTML back to markdown (basic conversion)
+      const markdown = htmlToMarkdown(article.body);
+      setMarkdownContent(markdown);
+      
+      // Load section info to get category
+      const sectionResponse = await zdFetch<{ section: { category_id: number } }>(
+        `/api/v2/help_center/sections/${article.section_id}.json`
+      );
+      setSelectedCategoryId(sectionResponse.section.category_id.toString());
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load article",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const data = await zdFetch<CategoriesResponse>("/api/v2/help_center/categories.json");
+      setCategories(data.categories);
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load categories",
+        message: String(e),
+      });
+    }
+  }
+
+  async function loadSections(categoryId: string) {
+    try {
+      const data = await zdFetch<SectionsResponse>(`/api/v2/help_center/categories/${categoryId}/sections.json`);
+      setSections(data.sections);
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load sections",
+        message: String(e),
+      });
+    }
+  }
+
+  function htmlToMarkdown(html: string): string {
+    // Basic HTML to markdown conversion
+    return html
+      // Headers
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1")
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1")
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1")
+      // Bold and italic
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**")
+      .replace(/<em[^>]*>(.*?)<\/em>/gi, "*$1*")
+      // Code blocks
+      .replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, "```\n$1\n```")
+      .replace(/<code[^>]*>(.*?)<\/code>/gi, "`$1`")
+      // Links
+      .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, "[$2]($1)")
+      // Paragraphs and line breaks
+      .replace(/<\/p><p[^>]*>/gi, "\n\n")
+      .replace(/<p[^>]*>/gi, "")
+      .replace(/<\/p>/gi, "")
+      .replace(/<br[^>]*>/gi, "\n")
+      // Clean up remaining tags
+      .replace(/<[^>]*>/g, "")
+      // Clean up extra whitespace
+      .replace(/\n\n\n+/g, "\n\n")
+      .trim();
+  }
+
+  function convertMarkdownToHtml(markdown: string): string {
+    // Basic markdown to HTML conversion (same as CreateArticleForm)
+    let html = markdown
+      .replace(/^### (.*)/gm, "<h3>$1</h3>")
+      .replace(/^## (.*)/gm, "<h2>$1</h2>")
+      .replace(/^# (.*)/gm, "<h1>$1</h1>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+      .replace(/`(.*?)`/g, "<code>$1</code>")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+      .replace(/\n\n/g, "</p><p>")
+      .replace(/\n/g, "<br>");
+
+    if (!html.includes("<p>") && !html.includes("<h")) {
+      html = `<p>${html}</p>`;
+    }
+
+    return html;
+  }
+
+  async function handleSubmit() {
+    if (!title || !markdownContent || !selectedSectionId) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Missing fields",
+        message: "Please fill in all required fields",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const htmlContent = convertMarkdownToHtml(markdownContent);
+
+      const articleData = {
+        article: {
+          title,
+          body: htmlContent,
+          draft: !isPublic,
+          section_id: parseInt(selectedSectionId),
+        },
+      };
+
+      await zdFetch(`/api/v2/help_center/articles/${articleId}.json`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(articleData),
+      });
+
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Article updated successfully",
+        message: `Article "${title}" has been updated`,
+      });
+
+      popToRoot();
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to update article",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return <Form isLoading={true} />;
+  }
+
+  return (
+    <Form
+      isLoading={loading}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Update Article" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.TextField 
+        id="title" 
+        title="Article Title" 
+        placeholder="Enter article title" 
+        value={title} 
+        onChange={setTitle} 
+      />
+
+      <Form.TextArea
+        id="content"
+        title="Content (Markdown)"
+        placeholder="Edit your markdown content here..."
+        value={markdownContent}
+        onChange={setMarkdownContent}
+      />
+
+      <Form.Dropdown
+        id="category"
+        title="Category"
+        value={selectedCategoryId}
+        onChange={setSelectedCategoryId}
+      >
+        {categories.map((category) => (
+          <Form.Dropdown.Item key={category.id} value={category.id.toString()} title={category.name} />
+        ))}
+      </Form.Dropdown>
+
+      <Form.Dropdown
+        id="section"
+        title="Section"
+        value={selectedSectionId}
+        onChange={setSelectedSectionId}
+        isLoading={Boolean(selectedCategoryId) && sections.length === 0}
+      >
+        {sections.map((section) => (
+          <Form.Dropdown.Item key={section.id} value={section.id.toString()} title={section.name} />
+        ))}
+      </Form.Dropdown>
+
+      <Form.Checkbox
+        id="isPublic"
+        title="Publish Article"
+        label="Make article public"
+        value={isPublic}
+        onChange={setIsPublic}
+      />
+
+      <Form.Description text="Edit the article content in markdown format. Changes will be converted to HTML automatically." />
     </Form>
   );
 }
