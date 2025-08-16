@@ -28,6 +28,8 @@ type ExtensionPreferences = {
 declare type Preferences = ExtensionPreferences
 
 declare namespace Preferences {
+  /** Preferences accessible in the `dashboard` command */
+  export type Dashboard = ExtensionPreferences & {}
   /** Preferences accessible in the `tickets` command */
   export type Tickets = ExtensionPreferences & {}
   /** Preferences accessible in the `search-zendesk-support-center` command */
@@ -35,6 +37,8 @@ declare namespace Preferences {
 }
 
 declare namespace Arguments {
+  /** Arguments passed to the `dashboard` command */
+  export type Dashboard = {}
   /** Arguments passed to the `tickets` command */
   export type Tickets = {}
   /** Arguments passed to the `search-zendesk-support-center` command */
