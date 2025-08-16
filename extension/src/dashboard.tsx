@@ -30,26 +30,32 @@ export default function Dashboard() {
     setLoading(true);
     try {
       await getCurrentUserId(); // Verify auth
-      
+
       // Get current stats
       const [solvedResponse, pendingResponse, openResponse] = await Promise.all([
-        zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(`/api/v2/search.json?query=type:ticket assignee:me status:solved`),
-        zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(`/api/v2/search.json?query=type:ticket assignee:me status:pending`),
-        zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(`/api/v2/search.json?query=type:ticket assignee:me status:open`),
+        zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(
+          `/api/v2/search.json?query=type:ticket assignee:me status:solved`,
+        ),
+        zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(
+          `/api/v2/search.json?query=type:ticket assignee:me status:pending`,
+        ),
+        zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(
+          `/api/v2/search.json?query=type:ticket assignee:me status:open`,
+        ),
       ]);
 
       // Get this week's solved tickets
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const thisWeekResponse = await zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(
-        `/api/v2/search.json?query=type:ticket assignee:me status:solved solved>${oneWeekAgo.toISOString().split('T')[0]}`
+        `/api/v2/search.json?query=type:ticket assignee:me status:solved solved>${oneWeekAgo.toISOString().split("T")[0]}`,
       );
 
       // Get this month's solved tickets
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       const thisMonthResponse = await zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(
-        `/api/v2/search.json?query=type:ticket assignee:me status:solved solved>${oneMonthAgo.toISOString().split('T')[0]}`
+        `/api/v2/search.json?query=type:ticket assignee:me status:solved solved>${oneMonthAgo.toISOString().split("T")[0]}`,
       );
 
       // Generate weekly data for the last 8 weeks
@@ -65,12 +71,11 @@ export default function Dashboard() {
       });
 
       setWeeklyData(weeklyStats);
-
     } catch (e) {
-      await showToast({ 
-        style: Toast.Style.Failure, 
-        title: "Failed to load dashboard", 
-        message: String(e) 
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load dashboard",
+        message: String(e),
       });
     } finally {
       setLoading(false);
@@ -79,27 +84,27 @@ export default function Dashboard() {
 
   async function generateWeeklyStats(): Promise<TimeSeriesData[]> {
     const weeks: TimeSeriesData[] = [];
-    
+
     for (let i = 7; i >= 0; i--) {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - (i * 7 + 7));
       const endDate = new Date();
-      endDate.setDate(endDate.getDate() - (i * 7));
+      endDate.setDate(endDate.getDate() - i * 7);
 
       try {
         const response = await zdFetch<{ results: Array<{ id: number; subject: string; updated_at: string }> }>(
-          `/api/v2/search.json?query=type:ticket assignee:me status:solved solved>${startDate.toISOString().split('T')[0]} solved<${endDate.toISOString().split('T')[0]}`
+          `/api/v2/search.json?query=type:ticket assignee:me status:solved solved>${startDate.toISOString().split("T")[0]} solved<${endDate.toISOString().split("T")[0]}`,
         );
 
         weeks.push({
-          date: startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          count: response.results.length
+          date: startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          count: response.results.length,
         });
       } catch (e) {
         console.error(`Failed to get stats for week ${i}:`, e);
         weeks.push({
-          date: startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          count: 0
+          date: startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          count: 0,
         });
       }
     }
@@ -109,15 +114,17 @@ export default function Dashboard() {
 
   function generateSparkline(data: TimeSeriesData[]): string {
     if (data.length === 0) return "";
-    
-    const max = Math.max(...data.map(d => d.count));
+
+    const max = Math.max(...data.map((d) => d.count));
     if (max === 0) return "▁".repeat(data.length);
-    
+
     const bars = "▁▂▃▄▅▆▇█";
-    return data.map(d => {
-      const normalized = Math.floor((d.count / max) * (bars.length - 1));
-      return bars[normalized];
-    }).join("");
+    return data
+      .map((d) => {
+        const normalized = Math.floor((d.count / max) * (bars.length - 1));
+        return bars[normalized];
+      })
+      .join("");
   }
 
   if (loading || !stats) {
@@ -141,8 +148,8 @@ export default function Dashboard() {
 ## 📊 8-Week Trend
 \`\`\`
 ${generateSparkline(weeklyData)}
-${weeklyData.map(d => d.date.slice(0, 3)).join(" ")}
-${weeklyData.map(d => d.count.toString().padStart(3)).join(" ")}
+${weeklyData.map((d) => d.date.slice(0, 3)).join(" ")}
+${weeklyData.map((d) => d.count.toString().padStart(3)).join(" ")}
 \`\`\`
 
 ## 🏆 Performance Metrics
@@ -186,15 +193,15 @@ function DashboardTicketList() {
     try {
       // Get last 10 solved tickets
       const response = await zdFetch<{ results: Ticket[] }>(
-        `/api/v2/search.json?query=type:ticket assignee:me status:solved sort:updated_at`
+        `/api/v2/search.json?query=type:ticket assignee:me status:solved sort:updated_at`,
       );
-      
+
       setRecentTickets(response.results.slice(0, 10));
     } catch (e) {
-      await showToast({ 
-        style: Toast.Style.Failure, 
-        title: "Failed to load recent tickets", 
-        message: String(e) 
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load recent tickets",
+        message: String(e),
       });
     } finally {
       setLoading(false);
@@ -208,10 +215,7 @@ function DashboardTicketList() {
           key={ticket.id}
           title={ticket.subject || `Ticket #${ticket.id}`}
           subtitle={`Solved • Updated ${new Date(ticket.updated_at).toLocaleDateString()}`}
-          accessories={[
-            { tag: { value: "Solved", color: "#00C853" } },
-            { date: new Date(ticket.updated_at) }
-          ]}
+          accessories={[{ tag: { value: "Solved", color: "#00C853" } }, { date: new Date(ticket.updated_at) }]}
         />
       ))}
     </List>
