@@ -12,6 +12,7 @@ import {
 import React, { useEffect, useState } from "react";
 import { zdFetch, getAgentTicketUrl, getCurrentUserId, getAuthHeader } from "./zendesk";
 import { MacroList } from "./macros";
+import { TicketToArticleAction } from "./ticket-to-article";
 
 interface Ticket {
   id: number;
@@ -205,6 +206,7 @@ export default function Tickets() {
                 target={<MacroList ticketId={t.id} onMacroApplied={() => load(query)} />} 
                 shortcut={{ modifiers: ["cmd"], key: "m" }}
               />
+              <TicketToArticleAction ticketId={t.id} ticketSubject={t.subject} />
               <Action title="Assign to Me" onAction={() => assignToMe(t.id)} />
               <Action title="Mark as Solved" onAction={() => updateStatus(t.id, "solved")} />
               <Action
@@ -719,6 +721,7 @@ ${comment.body}
             target={<MacroList ticketId={ticketId} />} 
             shortcut={{ modifiers: ["cmd"], key: "m" }}
           />
+          <TicketToArticleAction ticketId={ticketId} ticketSubject={ticket?.subject || `Ticket ${ticketId}`} />
           <Action title="Assign to Me" onAction={() => assignToMe(ticketId)} />
           <Action title="Mark as Solved" onAction={() => updateStatus(ticketId, "solved")} />
           <Action title="Mark as Pending" onAction={() => updateStatus(ticketId, "pending")} />

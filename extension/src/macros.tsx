@@ -7,6 +7,7 @@ import {
   showToast,
   Toast,
   popToRoot,
+  getPreferenceValues,
 } from "@raycast/api";
 import React, { useEffect, useState } from "react";
 import { 
@@ -14,10 +15,12 @@ import {
   applyMacro, 
   createMacro, 
   getMacroPreview,
+  getTicketField,
   Macro, 
   MacroAction 
 } from "./zendesk";
 import AISuggestions from "./ai-suggestions";
+import ZendeskPlaceholders from "./zendesk-placeholders";
 
 // Wrapper component to handle the props issue
 function AISuggestionsWrapper({ onRefresh }: { onRefresh?: () => Promise<void> }) {
@@ -361,6 +364,47 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
   const [changeAssignee, setChangeAssignee] = useState(false);
   const [assigneeValue, setAssigneeValue] = useState("");
 
+  // Custom fields
+  const [changeSystemField, setChangeSystemField] = useState(false);
+  const [systemFieldValue, setSystemFieldValue] = useState("");
+  const [systemFieldOptions, setSystemFieldOptions] = useState<Array<{id: number; name: string; value: string}>>([]);
+  const [changeIssueField, setChangeIssueField] = useState(false);
+  const [issueFieldValue, setIssueFieldValue] = useState("");
+  const [issueFieldOptions, setIssueFieldOptions] = useState<Array<{id: number; name: string; value: string}>>([]);
+
+  // Get preferences for custom field IDs
+  const preferences = getPreferenceValues<{
+    enableSystemField?: boolean;
+    systemFieldId?: string;
+    enableIssueField?: boolean;
+    issueFieldId?: string;
+  }>();
+
+  // Load custom field options on component mount
+  useEffect(() => {
+    async function loadFieldOptions() {
+      try {
+        if (preferences.enableSystemField && preferences.systemFieldId) {
+          const systemField = await getTicketField(preferences.systemFieldId);
+          if (systemField.custom_field_options) {
+            setSystemFieldOptions(systemField.custom_field_options);
+          }
+        }
+        
+        if (preferences.enableIssueField && preferences.issueFieldId) {
+          const issueField = await getTicketField(preferences.issueFieldId);
+          if (issueField.custom_field_options) {
+            setIssueFieldOptions(issueField.custom_field_options);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load field options:", error);
+      }
+    }
+
+    loadFieldOptions();
+  }, [preferences.systemFieldId, preferences.issueFieldId]);
+
   async function handleSubmit() {
     if (!title.trim()) {
       await showToast({
@@ -383,10 +427,16 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
       actions.push({ field: "priority", value: priorityValue });
     }
 
-    // Add comment action
+    // Add comment action (try Zendesk standard format)
     if (addComment && commentBody.trim()) {
-      actions.push({ field: "comment", value: commentBody });
-      actions.push({ field: "comment_is_public", value: commentPublic });
+      actions.push({ 
+        field: "comment_value", 
+        value: commentBody
+      });
+      actions.push({
+        field: "comment_mode_is_public",
+        value: commentPublic
+      });
     }
 
     // Add assignee action
@@ -394,6 +444,21 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
       actions.push({ 
         field: "assignee_id", 
         value: assigneeValue === "current_user" ? "current_user" : assigneeValue 
+      });
+    }
+
+    // Add custom field actions
+    if (changeSystemField && preferences.enableSystemField && preferences.systemFieldId && systemFieldValue) {
+      actions.push({
+        field: `custom_fields_${preferences.systemFieldId}`,
+        value: systemFieldValue
+      });
+    }
+
+    if (changeIssueField && preferences.enableIssueField && preferences.issueFieldId && issueFieldValue) {
+      actions.push({
+        field: `custom_fields_${preferences.issueFieldId}`,
+        value: issueFieldValue
       });
     }
 
@@ -409,23 +474,51 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
     setLoading(true);
 
     try {
-      await createMacro({
+      const macroData = {
         title: title.trim(),
         description: description.trim() || undefined,
         actions,
-      });
+      };
+      
+      console.log("Creating macro with data:", JSON.stringify(macroData, null, 2));
+      console.log("Individual actions:", actions);
+      
+      const result = await createMacro(macroData);
+      console.log("Macro creation result:", result);
 
       await showToast({
         style: Toast.Style.Success,
         title: "Macro created successfully",
-        message: `Created macro: ${title}`,
+        message: `Created macro: ${title} (ID: ${result.macro.id})`,
       });
 
       if (onMacroCreated) {
-        onMacroCreated();
+        await onMacroCreated();
       }
+      
+      // Verify the macro was actually created by trying to fetch it
+      setTimeout(async () => {
+        try {
+          const updatedMacros = await getMacros();
+          const createdMacro = updatedMacros.find(m => m.title === title.trim());
+          if (createdMacro) {
+            console.log("Macro verification successful:", createdMacro);
+          } else {
+            console.warn("Macro not found in updated list - creation may have failed silently");
+            await showToast({
+              style: Toast.Style.Failure,
+              title: "Warning",
+              message: "Macro may not have been saved properly",
+            });
+          }
+        } catch (error) {
+          console.error("Failed to verify macro creation:", error);
+        }
+      }, 2000);
+      
       popToRoot();
     } catch (e) {
+      console.error("Macro creation error:", e);
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to create macro",
@@ -442,6 +535,12 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Create Macro" onSubmit={handleSubmit} />
+          <Action.Push 
+            title="View Placeholders" 
+            icon="📝"
+            target={<ZendeskPlaceholders />}
+            shortcut={{ modifiers: ["cmd"], key: "p" }}
+          />
         </ActionPanel>
       }
     >
@@ -511,6 +610,67 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
           <Form.Dropdown.Item value="current_user" title="Assign to Me" />
           <Form.Dropdown.Item value="" title="Unassigned" />
         </Form.Dropdown>
+      )}
+
+      <Form.Separator />
+
+      {/* Custom Fields */}
+      {preferences.enableSystemField && preferences.systemFieldId && (
+        <>
+          <Form.Checkbox
+            id="changeSystemField"
+            label="Set System Field"
+            value={changeSystemField}
+            onChange={setChangeSystemField}
+          />
+          
+          {changeSystemField && (
+            <Form.Dropdown 
+              id="systemField" 
+              title="System Field Value" 
+              value={systemFieldValue} 
+              onChange={setSystemFieldValue}
+            >
+              <Form.Dropdown.Item value="" title="Select System..." />
+              {systemFieldOptions.map((option) => (
+                <Form.Dropdown.Item
+                  key={option.id}
+                  value={option.value}
+                  title={option.name}
+                />
+              ))}
+            </Form.Dropdown>
+          )}
+        </>
+      )}
+
+      {preferences.enableIssueField && preferences.issueFieldId && (
+        <>
+          <Form.Checkbox
+            id="changeIssueField"
+            label="Set Issue Field"
+            value={changeIssueField}
+            onChange={setChangeIssueField}
+          />
+          
+          {changeIssueField && (
+            <Form.Dropdown 
+              id="issueField" 
+              title="Issue Field Value" 
+              value={issueFieldValue} 
+              onChange={setIssueFieldValue}
+            >
+              <Form.Dropdown.Item value="" title="Select Issue..." />
+              {issueFieldOptions.map((option) => (
+                <Form.Dropdown.Item
+                  key={option.id}
+                  value={option.value}
+                  title={option.name}
+                />
+              ))}
+            </Form.Dropdown>
+          )}
+        </>
       )}
 
       {/* Comment Action */}

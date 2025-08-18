@@ -112,10 +112,21 @@ export async function createMacro(macroData: {
   description?: string;
   actions: MacroAction[];
 }): Promise<{ macro: Macro }> {
-  return await zdFetch<{ macro: Macro }>("/api/v2/macros.json", {
-    method: "POST",
-    body: JSON.stringify({ macro: macroData })
-  });
+  try {
+    console.log("Sending macro creation request to Zendesk API...");
+    console.log("Request body:", JSON.stringify({ macro: macroData }, null, 2));
+    
+    const result = await zdFetch<{ macro: Macro }>("/api/v2/macros.json", {
+      method: "POST",
+      body: JSON.stringify({ macro: macroData })
+    });
+    
+    console.log("Zendesk API response:", result);
+    return result;
+  } catch (error) {
+    console.error("Zendesk API error:", error);
+    throw error;
+  }
 }
 
 // Get macro preview (what would happen if applied)
@@ -190,4 +201,33 @@ export async function debugArticleFields(articleId: number): Promise<any> {
     console.error("Error fetching article:", error);
     throw error;
   }
+}
+
+// Get ticket field details including options
+export async function getTicketField(fieldId: string): Promise<{
+  id: number;
+  title: string;
+  type: string;
+  custom_field_options?: Array<{
+    id: number;
+    name: string;
+    value: string;
+    default?: boolean;
+  }>;
+}> {
+  const response = await zdFetch<{ 
+    ticket_field: {
+      id: number;
+      title: string;
+      type: string;
+      custom_field_options?: Array<{
+        id: number;
+        name: string;
+        value: string;
+        default?: boolean;
+      }>;
+    }
+  }>(`/api/v2/ticket_fields/${fieldId}.json`);
+  
+  return response.ticket_field;
 }
