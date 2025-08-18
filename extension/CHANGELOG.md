@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [Unreleased] - {PR_MERGE_DATE}
 
 ### Added
 - Complete Zendesk agent toolkit for Raycast

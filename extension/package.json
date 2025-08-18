@@ -12,7 +12,9 @@
     "url": "https://github.com/Unicornninja80/raycast-zendesk.git"
   },
   "private": true,
-  "categories": ["Productivity"],
+  "categories": [
+    "Productivity"
+  ],
   "preferences": [
     {
       "name": "subdomain",
@@ -143,7 +145,8 @@
     "publish": "npx @raycast/api@latest publish"
   },
   "dependencies": {
-    "@raycast/api": "1.102.4"
+    "@raycast/api": "1.102.4",
+    "@raycast/utils": "^2.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.10",

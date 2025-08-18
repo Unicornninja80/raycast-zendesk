@@ -9,6 +9,7 @@ import {
   getPreferenceValues,
   popToRoot,
 } from "@raycast/api";
+import { showFailureToast } from "@raycast/utils";
 import React, { useEffect, useState } from "react";
 import { zdFetch, getAgentTicketUrl, getCurrentUserId, getAuthHeader } from "./zendesk";
 import { MacroList } from "./macros";
@@ -84,6 +85,7 @@ export default function Tickets() {
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [query, setQuery] = useState("type:ticket assignee:me status:open");
+  const [searchText, setSearchText] = useState("");
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [onlyOpenTickets, setOnlyOpenTickets] = useState<boolean>(true);
@@ -101,7 +103,7 @@ export default function Tickets() {
       );
       setTickets(data.results.filter((r) => r.result_type === "ticket"));
     } catch (e) {
-      await showToast({ style: Toast.Style.Failure, title: "Failed to load tickets", message: String(e) });
+      await showFailureToast(e, { title: "Failed to load tickets" });
     } finally {
       setLoading(false);
     }
@@ -116,33 +118,43 @@ export default function Tickets() {
     }
   }
 
-  function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean) {
+  function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean, searchTerms?: string) {
     const statusPart = openOnly ? "status:open" : "status:open status:pending status:new";
+    const searchPart = searchTerms && searchTerms.trim() ? ` ${searchTerms.trim()}` : "";
 
     if (assignmentType === "me") {
-      return `type:ticket assignee:me ${statusPart}`;
+      return `type:ticket assignee:me ${statusPart}${searchPart}`;
     } else if (assignmentType === "group" && groupId) {
-      return `type:ticket group:${groupId} ${statusPart}`;
+      return `type:ticket group:${groupId} ${statusPart}${searchPart}`;
     }
-    return `type:ticket assignee:me ${statusPart}`;
+    return `type:ticket assignee:me ${statusPart}${searchPart}`;
   }
 
   function handleAssignmentTypeChange(type: "me" | "group", groupId?: number) {
     if (type === "me") {
       setSelectedGroupId(null);
-      setQuery(buildQuery("me", undefined, onlyOpenTickets));
+      setQuery(buildQuery("me", undefined, onlyOpenTickets, searchText));
     } else if (type === "group" && groupId) {
       setSelectedGroupId(groupId);
-      setQuery(buildQuery("group", groupId, onlyOpenTickets));
+      setQuery(buildQuery("group", groupId, onlyOpenTickets, searchText));
     }
   }
 
   function handleOpenTicketsToggle(checked: boolean) {
     setOnlyOpenTickets(checked);
     if (selectedGroupId) {
-      setQuery(buildQuery("group", selectedGroupId, checked));
+      setQuery(buildQuery("group", selectedGroupId, checked, searchText));
     } else {
-      setQuery(buildQuery("me", undefined, checked));
+      setQuery(buildQuery("me", undefined, checked, searchText));
+    }
+  }
+
+  function handleSearchTextChange(text: string) {
+    setSearchText(text);
+    if (selectedGroupId) {
+      setQuery(buildQuery("group", selectedGroupId, onlyOpenTickets, text));
+    } else {
+      setQuery(buildQuery("me", undefined, onlyOpenTickets, text));
     }
   }
 
@@ -158,7 +170,7 @@ export default function Tickets() {
     <List
       isLoading={loading}
       searchBarPlaceholder="Search Zendesk…"
-      onSearchTextChange={setQuery}
+      onSearchTextChange={handleSearchTextChange}
       throttle
       searchBarAccessory={
         <List.Dropdown
@@ -496,7 +508,7 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
       await showToast({ style: Toast.Style.Success, title: "Ticket updated successfully" });
       popToRoot();
     } catch (e) {
-      await showToast({ style: Toast.Style.Failure, title: "Failed to update ticket", message: String(e) });
+      await showFailureToast(e, { title: "Failed to update ticket" });
     }
   }
 
@@ -595,7 +607,7 @@ async function assignToMe(ticketId: number) {
     });
     await showToast({ style: Toast.Style.Success, title: "Assigned to you" });
   } catch (e) {
-    await showToast({ style: Toast.Style.Failure, title: "Failed to assign", message: String(e) });
+    await showFailureToast(e, { title: "Failed to assign" });
   }
 }
 
@@ -607,7 +619,7 @@ async function updateStatus(ticketId: number, status: "pending" | "solved" | "op
     });
     await showToast({ style: Toast.Style.Success, title: `Marked ${status}` });
   } catch (e) {
-    await showToast({ style: Toast.Style.Failure, title: "Failed to update status", message: String(e) });
+    await showFailureToast(e, { title: "Failed to update status" });
   }
 }
 
@@ -652,7 +664,7 @@ function TicketDetails({ ticketId }: { ticketId: number }) {
         setUsers(usersMap);
       }
     } catch (e) {
-      await showToast({ style: Toast.Style.Failure, title: "Failed to load ticket details", message: String(e) });
+      await showFailureToast(e, { title: "Failed to load ticket details" });
     } finally {
       setLoading(false);
     }

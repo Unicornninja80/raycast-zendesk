@@ -21,17 +21,21 @@ function convertMarkdownToHtml(markdown: string): string {
   html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
   
-  // Lists - numbered
-  html = html.replace(/^\d+\.\s+(.*)$/gm, (match, content) => `<li>${content.trim()}</li>`);
+  // Process lists more carefully to handle multiple separate lists
+  // First, convert numbered lists and mark them
+  html = html.replace(/^\d+\.\s+(.*)$/gm, (match, content) => `<li data-type="numbered">${content.trim()}</li>`);
   
-  // Lists - bullets  
-  html = html.replace(/^[-*]\s+(.*)$/gm, (match, content) => `<li>${content.trim()}</li>`);
+  // Convert bullet lists and mark them  
+  html = html.replace(/^[-*]\s+(.*)$/gm, (match, content) => `<li data-type="bullet">${content.trim()}</li>`);
   
-  // Wrap consecutive list items in appropriate tags
-  html = html.replace(/((?:<li>.*<\/li>\s*)+)/g, (match) => {
-    // Count if we have numbered items by looking at original markdown
-    const hasNumbers = markdown.includes('1.') || markdown.includes('2.') || markdown.includes('3.');
-    return hasNumbers ? `<ol>${match}</ol>` : `<ul>${match}</ul>`;
+  // Wrap consecutive list items, handling multiple separate lists correctly
+  // This regex will match all consecutive li elements globally
+  html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/g, (match) => {
+    // Determine the type based on the first list item in this group
+    const isNumbered = match.includes('data-type="numbered"');
+    // Clean up the data attributes
+    const cleanMatch = match.replace(/ data-type="(numbered|bullet)"/g, '');
+    return isNumbered ? `<ol>${cleanMatch}</ol>` : `<ul>${cleanMatch}</ul>`;
   });
   
   // Bold and italic
