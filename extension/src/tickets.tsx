@@ -359,20 +359,24 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
       setSelectedStatus(loadedTicket.status || "");
       setSelectedAssigneeId(loadedTicket.assignee_id?.toString() || "");
       
-      // Load custom field values
+      // Load custom field values with better null handling
       if (loadedTicket.custom_fields) {
         if (preferences.enableSystemField && preferences.systemFieldId) {
           const systemField = loadedTicket.custom_fields.find(
             (field) => field.id === parseInt(preferences.systemFieldId!)
           );
-          setSystemFieldValue(systemField?.value?.toString() || "");
+          const value = systemField?.value;
+          setSystemFieldValue(value !== null && value !== undefined ? value.toString() : "");
+          console.log("Loaded system field value:", value, "->", systemField?.value?.toString() || "");
         }
         
         if (preferences.enableIssueField && preferences.issueFieldId) {
           const issueField = loadedTicket.custom_fields.find(
             (field) => field.id === parseInt(preferences.issueFieldId!)
           );
-          setIssueFieldValue(issueField?.value?.toString() || "");
+          const value = issueField?.value;
+          setIssueFieldValue(value !== null && value !== undefined ? value.toString() : "");
+          console.log("Loaded issue field value:", value, "->", issueField?.value?.toString() || "");
         }
       }
     } catch (e) {
@@ -427,7 +431,7 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
       const updateData: {
         status?: string;
         assignee_id?: number | null;
-        custom_fields?: Array<{ id: number; value: string }>;
+        custom_fields?: Array<{ id: number; value: string | null }>;
         comment?: { body: string; public: boolean; uploads?: string[] };
       } = {};
 
@@ -440,37 +444,28 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
         updateData.assignee_id = selectedAssigneeId ? parseInt(selectedAssigneeId) : null;
       }
 
-      // Add custom fields if changed
-      const customFields: Array<{ id: number; value: string }> = [];
+      // Always send custom fields to ensure persistence
+      const customFields: Array<{ id: number; value: string | null }> = [];
       
       if (preferences.enableSystemField && preferences.systemFieldId) {
-        const currentSystemValue = ticket?.custom_fields?.find(
-          (field) => field.id === parseInt(preferences.systemFieldId!)
-        )?.value?.toString() || "";
-        
-        if (systemFieldValue !== currentSystemValue) {
-          customFields.push({
-            id: parseInt(preferences.systemFieldId),
-            value: systemFieldValue,
-          });
-        }
+        // Always include system field, even if empty
+        customFields.push({
+          id: parseInt(preferences.systemFieldId),
+          value: systemFieldValue || null,
+        });
       }
       
       if (preferences.enableIssueField && preferences.issueFieldId) {
-        const currentIssueValue = ticket?.custom_fields?.find(
-          (field) => field.id === parseInt(preferences.issueFieldId!)
-        )?.value?.toString() || "";
-        
-        if (issueFieldValue !== currentIssueValue) {
-          customFields.push({
-            id: parseInt(preferences.issueFieldId),
-            value: issueFieldValue,
-          });
-        }
+        // Always include issue field, even if empty  
+        customFields.push({
+          id: parseInt(preferences.issueFieldId),
+          value: issueFieldValue || null,
+        });
       }
       
       if (customFields.length > 0) {
         updateData.custom_fields = customFields;
+        console.log("Sending custom fields:", customFields);
       }
 
       // Add comment if provided
@@ -487,10 +482,14 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
         updateData.comment = comment;
       }
 
-      await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
+      console.log("Update data being sent:", JSON.stringify({ ticket: updateData }, null, 2));
+      
+      const response = await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
         method: "PUT",
         body: JSON.stringify({ ticket: updateData }),
       });
+      
+      console.log("Update response:", response);
       
       await showToast({ style: Toast.Style.Success, title: "Ticket updated successfully" });
       popToRoot();
