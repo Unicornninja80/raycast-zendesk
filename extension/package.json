@@ -71,6 +71,23 @@
       "description": "Your Zendesk Issue custom field ID (find in admin settings)",
       "required": false,
       "placeholder": "123457"
+    },
+    {
+      "name": "openaiApiKey",
+      "type": "password",
+      "title": "OpenAI API Key",
+      "description": "Your OpenAI API key for AI-powered macro generation",
+      "required": false,
+      "placeholder": "sk-..."
+    },
+    {
+      "name": "enableAIMacros",
+      "type": "checkbox",
+      "title": "Enable AI Macro Generation",
+      "label": "Automatically suggest macros based on ticket patterns",
+      "description": "Use AI to analyze resolved tickets and suggest new macros",
+      "required": false,
+      "default": true
     }
   ],
   "commands": [
@@ -86,6 +103,27 @@
       "title": "My Tickets",
       "subtitle": "Zendesk",
       "description": "View and manage your assigned tickets",
+      "mode": "view"
+    },
+    {
+      "name": "macros-entry",
+      "title": "Macros",
+      "subtitle": "Zendesk",
+      "description": "Manage and create macros for quick ticket actions",
+      "mode": "view"
+    },
+    {
+      "name": "ai-suggestions",
+      "title": "AI Macro Suggestions",
+      "subtitle": "Zendesk",
+      "description": "AI-powered macro suggestions based on your ticket patterns",
+      "mode": "view"
+    },
+    {
+      "name": "test-ai",
+      "title": "Test AI System",
+      "subtitle": "Zendesk",
+      "description": "Test and debug the AI macro generation system",
       "mode": "view"
     },
     {

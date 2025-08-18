@@ -1,6 +1,8 @@
-import { Action, ActionPanel, Detail, List, showToast, Toast, getPreferenceValues } from "@raycast/api";
+import { Action, ActionPanel, Detail, showToast, Toast, getPreferenceValues } from "@raycast/api";
 import React, { useEffect, useState } from "react";
 import { zdFetch, getCurrentUserId } from "./zendesk";
+import { ticketMonitor } from "./ticket-monitor";
+import AISuggestions from "./ai-suggestions";
 
 interface DailyTicketData {
   date: string;
@@ -26,6 +28,7 @@ export default function Dashboard() {
   const [dailyData, setDailyData] = useState<DailyTicketData[]>([]);
   const [systemsData, setSystemsData] = useState<SystemData[]>([]);
   const [openTickets, setOpenTickets] = useState<OpenTicket[]>([]);
+  const [aiSuggestionsCount, setAISuggestionsCount] = useState<number>(0);
 
   useEffect(() => {
     loadDashboardData();
@@ -47,14 +50,18 @@ export default function Dashboard() {
       // Generate systems breakdown
       const systemsStats = await generateSystemsBreakdown();
 
+      // Check for AI macro suggestions
+      const suggestions = await ticketMonitor.checkForResolvedTickets();
+
       setDailyData(dailyStats);
       setSystemsData(systemsStats);
       setOpenTickets(openResponse.results);
-    } catch (e) {
+      setAISuggestionsCount(suggestions.length);
+    } catch (error) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to load dashboard",
-        message: String(e),
+        message: String(error),
       });
     } finally {
       setLoading(false);
@@ -214,6 +221,8 @@ export default function Dashboard() {
   const markdown = `
 # Zendesk Dashboard
 
+${aiSuggestionsCount > 0 ? `🤖 **${aiSuggestionsCount} AI Macro Suggestions Available!** - [View Suggestions](raycast://extensions/zendesk-agent-toolkit/ai-suggestions)\n\n` : ""}
+
 ## 📋 Open Tickets Assigned to You (${openTickets.length})
 
 ${openTickets.length === 0 
@@ -242,6 +251,13 @@ ${generateSystemsChart(systemsData)}
       actions={
         <ActionPanel>
           <Action title="Refresh" onAction={loadDashboardData} />
+          {aiSuggestionsCount > 0 && (
+            <Action.Push 
+              title={`View ${aiSuggestionsCount} AI Macro Suggestions`} 
+              icon="🤖" 
+              target={<AISuggestions />}
+            />
+          )}
         </ActionPanel>
       }
     />

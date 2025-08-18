@@ -55,3 +55,139 @@ export async function getCurrentUserId(): Promise<number> {
   cachedCurrentUserId = me.user.id;
   return cachedCurrentUserId;
 }
+
+// Macro-related interfaces and functions
+export interface Macro {
+  id: number;
+  title: string;
+  active: boolean;
+  actions: MacroAction[];
+  created_at: string;
+  updated_at: string;
+  description?: string;
+}
+
+export interface MacroAction {
+  field: string;
+  value: string | number | boolean | null;
+}
+
+export interface MacrosResponse {
+  macros: Macro[];
+  next_page?: string;
+  previous_page?: string;
+  count: number;
+}
+
+export interface MacroApplicationResponse {
+  result: {
+    ticket: {
+      id: number;
+      subject: string;
+      status: string;
+      comment?: {
+        body: string;
+        public: boolean;
+      };
+    };
+  };
+}
+
+// Fetch all available macros
+export async function getMacros(): Promise<Macro[]> {
+  const response = await zdFetch<MacrosResponse>("/api/v2/macros.json?per_page=100");
+  return response.macros.filter(macro => macro.active);
+}
+
+// Apply a macro to a ticket
+export async function applyMacro(ticketId: number, macroId: number): Promise<MacroApplicationResponse> {
+  return await zdFetch<MacroApplicationResponse>(`/api/v2/tickets/${ticketId}/macros/${macroId}/apply.json`, {
+    method: "PUT"
+  });
+}
+
+// Create a new macro
+export async function createMacro(macroData: {
+  title: string;
+  description?: string;
+  actions: MacroAction[];
+}): Promise<{ macro: Macro }> {
+  return await zdFetch<{ macro: Macro }>("/api/v2/macros.json", {
+    method: "POST",
+    body: JSON.stringify({ macro: macroData })
+  });
+}
+
+// Get macro preview (what would happen if applied)
+export async function getMacroPreview(ticketId: number, macroId: number) {
+  return await zdFetch<MacroApplicationResponse>(`/api/v2/tickets/${ticketId}/macros/${macroId}/apply.json?get_changes_only=true`);
+}
+
+// Help Center article management functions
+
+export async function promoteArticle(articleId: number): Promise<{ article: { id: number; title: string; promoted: boolean } }> {
+  return await zdFetch<{ article: { id: number; title: string; promoted: boolean } }>(`/api/v2/help_center/articles/${articleId}.json`, {
+    method: "PUT",
+    body: JSON.stringify({
+      article: {
+        promoted: true
+      }
+    })
+  });
+}
+
+export async function archiveArticle(articleId: number): Promise<{ article: { id: number; title: string; archived: boolean } }> {
+  return await zdFetch<{ article: { id: number; title: string; archived: boolean } }>(`/api/v2/help_center/articles/${articleId}.json`, {
+    method: "PUT", 
+    body: JSON.stringify({
+      article: {
+        archived: true
+      }
+    })
+  });
+}
+
+export async function getArticleDetails(articleId: number): Promise<{ 
+  article: { 
+    id: number; 
+    title: string; 
+    body: string;
+    section_id: number;
+    draft: boolean; 
+    archived: boolean; 
+    promoted: boolean;
+    outdated?: boolean;
+    html_url: string;
+    created_at: string;
+    updated_at: string;
+  } 
+}> {
+  return await zdFetch<{ 
+    article: { 
+      id: number; 
+      title: string; 
+      body: string;
+      section_id: number;
+      draft: boolean; 
+      archived: boolean; 
+      promoted: boolean;
+      outdated?: boolean;
+      html_url: string;
+      created_at: string;
+      updated_at: string;
+    } 
+  }>(`/api/v2/help_center/articles/${articleId}.json`);
+}
+
+// Test function to see what article fields are actually returned
+export async function debugArticleFields(articleId: number): Promise<any> {
+  try {
+    const response = await zdFetch<any>(`/api/v2/help_center/articles/${articleId}.json`);
+    console.log("Article fields:", Object.keys(response.article));
+    console.log("Full article data:", response.article);
+    return response.article;
+  } catch (error) {
+    console.error("Error fetching article:", error);
+    throw error;
+  }
+}

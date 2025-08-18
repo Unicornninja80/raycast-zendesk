@@ -11,6 +11,7 @@ import {
 } from "@raycast/api";
 import React, { useEffect, useState } from "react";
 import { zdFetch, getAgentTicketUrl, getCurrentUserId, getAuthHeader } from "./zendesk";
+import { MacroList } from "./macros";
 
 interface Ticket {
   id: number;
@@ -198,6 +199,12 @@ export default function Tickets() {
               <Action.Push title="View Details" target={<TicketDetails ticketId={t.id} />} />
               <Action.OpenInBrowser url={getAgentTicketUrl(t.id)} />
               <Action.Push title="Manage Ticket" target={<ManageTicketForm ticketId={t.id} />} />
+              <Action.Push 
+                title="Apply Macro" 
+                icon="⚡" 
+                target={<MacroList ticketId={t.id} onMacroApplied={() => load(query)} />} 
+                shortcut={{ modifiers: ["cmd"], key: "m" }}
+              />
               <Action title="Assign to Me" onAction={() => assignToMe(t.id)} />
               <Action title="Mark as Solved" onAction={() => updateStatus(t.id, "solved")} />
               <Action
@@ -707,6 +714,12 @@ ${comment.body}
         <ActionPanel>
           <Action.OpenInBrowser url={getAgentTicketUrl(ticketId)} />
           <Action.Push title="Manage Ticket" target={<ManageTicketForm ticketId={ticketId} />} />
+          <Action.Push 
+            title="Apply Macro" 
+            icon="⚡" 
+            target={<MacroList ticketId={ticketId} />} 
+            shortcut={{ modifiers: ["cmd"], key: "m" }}
+          />
           <Action title="Assign to Me" onAction={() => assignToMe(ticketId)} />
           <Action title="Mark as Solved" onAction={() => updateStatus(ticketId, "solved")} />
           <Action title="Mark as Pending" onAction={() => updateStatus(ticketId, "pending")} />

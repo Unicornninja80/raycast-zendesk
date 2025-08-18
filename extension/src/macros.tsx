@@ -1,0 +1,547 @@
+import {
+  Action,
+  ActionPanel,
+  Form,
+  List,
+  Detail,
+  showToast,
+  Toast,
+  popToRoot,
+} from "@raycast/api";
+import React, { useEffect, useState } from "react";
+import { 
+  getMacros, 
+  applyMacro, 
+  createMacro, 
+  getMacroPreview,
+  Macro, 
+  MacroAction 
+} from "./zendesk";
+import AISuggestions from "./ai-suggestions";
+
+// Wrapper component to handle the props issue
+function AISuggestionsWrapper({ onRefresh }: { onRefresh?: () => Promise<void> }) {
+  return React.createElement(AISuggestions, { onRefresh });
+}
+
+interface MacroListProps {
+  ticketId?: number;
+  onMacroApplied?: () => void;
+}
+
+export function MacroList({ ticketId, onMacroApplied }: MacroListProps) {
+  const [loading, setLoading] = useState(true);
+  const [macros, setMacros] = useState<Macro[]>([]);
+
+  useEffect(() => {
+    loadMacros();
+  }, []);
+
+  async function loadMacros() {
+    setLoading(true);
+    try {
+      const macrosList = await getMacros();
+      setMacros(macrosList);
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load macros",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApplyMacro(macroId: number, macroTitle: string) {
+    if (!ticketId) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "No ticket selected",
+        message: "Cannot apply macro without a ticket",
+      });
+      return;
+    }
+
+    try {
+      await showToast({
+        style: Toast.Style.Animated,
+        title: `Applying macro: ${macroTitle}`,
+      });
+
+      await applyMacro(ticketId, macroId);
+      
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Macro applied successfully",
+        message: `Applied "${macroTitle}" to ticket #${ticketId}`,
+      });
+
+      if (onMacroApplied) {
+        onMacroApplied();
+      }
+      popToRoot();
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to apply macro",
+        message: String(e),
+      });
+    }
+  }
+
+
+
+  return (
+    <List
+      isLoading={loading}
+      navigationTitle={ticketId ? `Apply Macro to Ticket #${ticketId}` : "Manage Macros"}
+      searchBarPlaceholder="Search macros..."
+      actions={
+        <ActionPanel>
+          <Action.Push title="Create New Macro" target={<CreateMacroForm onMacroCreated={loadMacros} />} />
+          <Action.Push 
+            title="AI Suggestions" 
+            icon="🤖" 
+            target={<AISuggestionsWrapper onRefresh={loadMacros} />}
+            shortcut={{ modifiers: ["cmd"], key: "i" }}
+          />
+        </ActionPanel>
+      }
+    >
+      {macros.map((macro) => (
+        <List.Item
+          key={macro.id}
+          title={macro.title}
+          subtitle={macro.description}
+          accessories={[
+            { text: `${macro.actions.length} actions` },
+            { date: new Date(macro.updated_at) }
+          ]}
+          actions={
+            <ActionPanel>
+              {ticketId && (
+                <Action
+                  title={`Apply to Ticket #${ticketId}`}
+                  icon="⚡"
+                  onAction={() => handleApplyMacro(macro.id, macro.title)}
+                />
+              )}
+              <Action.Push
+                title="View Details"
+                target={<MacroDetails macro={macro} ticketId={ticketId} onMacroApplied={onMacroApplied} />}
+              />
+              {ticketId && (
+                <Action.Push
+                  title="Preview Changes"
+                  target={<MacroPreview macroId={macro.id} ticketId={ticketId} macroTitle={macro.title} />}
+                />
+              )}
+              <Action.Push title="Create New Macro" target={<CreateMacroForm onMacroCreated={loadMacros} />} />
+              <Action.Push 
+                title="AI Suggestions" 
+                icon="🤖" 
+                target={<AISuggestionsWrapper onRefresh={loadMacros} />}
+              />
+            </ActionPanel>
+          }
+        />
+      ))}
+    </List>
+  );
+}
+
+interface MacroDetailsProps {
+  macro: Macro;
+  ticketId?: number;
+  onMacroApplied?: () => void;
+}
+
+function MacroDetails({ macro, ticketId, onMacroApplied }: MacroDetailsProps) {
+  async function handleApplyMacro() {
+    if (!ticketId) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "No ticket selected",
+      });
+      return;
+    }
+
+    try {
+      await showToast({
+        style: Toast.Style.Animated,
+        title: `Applying macro: ${macro.title}`,
+      });
+
+      await applyMacro(ticketId, macro.id);
+      
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Macro applied successfully",
+      });
+
+      if (onMacroApplied) {
+        onMacroApplied();
+      }
+      popToRoot();
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to apply macro",
+        message: String(e),
+      });
+    }
+  }
+
+  const formatActions = (actions: MacroAction[]): string => {
+    return actions
+      .map((action) => {
+        const field = action.field.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+        let value = String(action.value);
+        
+        // Format special field values
+        if (action.field === "status" && typeof action.value === "string") {
+          value = action.value.charAt(0).toUpperCase() + action.value.slice(1);
+        }
+        
+        return `**${field}:** ${value}`;
+      })
+      .join("\n\n");
+  };
+
+  const markdown = `
+# ${macro.title}
+
+${macro.description ? `*${macro.description}*` : "*No description provided*"}
+
+---
+
+## Actions
+
+${formatActions(macro.actions)}
+
+---
+
+**Created:** ${new Date(macro.created_at).toLocaleDateString()}  
+**Updated:** ${new Date(macro.updated_at).toLocaleDateString()}  
+**ID:** ${macro.id}
+  `;
+
+  return (
+    <Detail
+      markdown={markdown}
+      actions={
+        <ActionPanel>
+          {ticketId && (
+            <Action
+              title={`Apply to Ticket #${ticketId}`}
+              icon="⚡"
+              onAction={handleApplyMacro}
+            />
+          )}
+          {ticketId && (
+            <Action.Push
+              title="Preview Changes"
+              target={<MacroPreview macroId={macro.id} ticketId={ticketId} macroTitle={macro.title} />}
+            />
+          )}
+        </ActionPanel>
+      }
+    />
+  );
+}
+
+interface MacroPreviewProps {
+  macroId: number;
+  ticketId: number;
+  macroTitle: string;
+}
+
+function MacroPreview({ macroId, ticketId, macroTitle }: MacroPreviewProps) {
+  const [loading, setLoading] = useState(true);
+  const [preview, setPreview] = useState<any>(null);
+
+  useEffect(() => {
+    loadPreview();
+  }, []);
+
+  async function loadPreview() {
+    setLoading(true);
+    try {
+      const previewData = await getMacroPreview(ticketId, macroId);
+      setPreview(previewData);
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to load preview",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApplyMacro() {
+    try {
+      await applyMacro(ticketId, macroId);
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Macro applied successfully",
+      });
+      popToRoot();
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to apply macro",
+        message: String(e),
+      });
+    }
+  }
+
+  if (loading || !preview) {
+    return <Detail isLoading={true} markdown="Loading macro preview..." />;
+  }
+
+  const markdown = `
+# Macro Preview: ${macroTitle}
+
+## Changes that will be applied to Ticket #${ticketId}:
+
+**Status:** ${preview.result.ticket.status}  
+**Subject:** ${preview.result.ticket.subject}
+
+${preview.result.ticket.comment ? `
+## Comment that will be added:
+
+**Type:** ${preview.result.ticket.comment.public ? "Public" : "Internal"}
+
+${preview.result.ticket.comment.body}
+` : ""}
+  `;
+
+  return (
+    <Detail
+      markdown={markdown}
+      actions={
+        <ActionPanel>
+          <Action
+            title="Apply Macro"
+            icon="⚡"
+            onAction={handleApplyMacro}
+          />
+        </ActionPanel>
+      }
+    />
+  );
+}
+
+interface CreateMacroFormProps {
+  onMacroCreated?: () => void;
+}
+
+function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
+  const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  
+  // Status action
+  const [changeStatus, setChangeStatus] = useState(false);
+  const [statusValue, setStatusValue] = useState("");
+  
+  // Priority action
+  const [changePriority, setChangePriority] = useState(false);
+  const [priorityValue, setPriorityValue] = useState("");
+  
+  // Comment action
+  const [addComment, setAddComment] = useState(false);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentPublic, setCommentPublic] = useState(true);
+  
+  // Assignment action
+  const [changeAssignee, setChangeAssignee] = useState(false);
+  const [assigneeValue, setAssigneeValue] = useState("");
+
+  async function handleSubmit() {
+    if (!title.trim()) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Title required",
+        message: "Please enter a title for the macro",
+      });
+      return;
+    }
+
+    const actions: MacroAction[] = [];
+
+    // Add status action
+    if (changeStatus && statusValue) {
+      actions.push({ field: "status", value: statusValue });
+    }
+
+    // Add priority action
+    if (changePriority && priorityValue) {
+      actions.push({ field: "priority", value: priorityValue });
+    }
+
+    // Add comment action
+    if (addComment && commentBody.trim()) {
+      actions.push({ field: "comment", value: commentBody });
+      actions.push({ field: "comment_is_public", value: commentPublic });
+    }
+
+    // Add assignee action
+    if (changeAssignee) {
+      actions.push({ 
+        field: "assignee_id", 
+        value: assigneeValue === "current_user" ? "current_user" : assigneeValue 
+      });
+    }
+
+    if (actions.length === 0) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "No actions defined",
+        message: "Please define at least one action for the macro",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await createMacro({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        actions,
+      });
+
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Macro created successfully",
+        message: `Created macro: ${title}`,
+      });
+
+      if (onMacroCreated) {
+        onMacroCreated();
+      }
+      popToRoot();
+    } catch (e) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to create macro",
+        message: String(e),
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Form
+      isLoading={loading}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Create Macro" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.TextField
+        id="title"
+        title="Macro Title"
+        placeholder="e.g., Escalate to L2 Support"
+        value={title}
+        onChange={setTitle}
+      />
+      
+      <Form.TextField
+        id="description"
+        title="Description (Optional)"
+        placeholder="Brief description of what this macro does"
+        value={description}
+        onChange={setDescription}
+      />
+
+      <Form.Separator />
+
+      {/* Status Action */}
+      <Form.Checkbox
+        id="changeStatus"
+        label="Change Status"
+        value={changeStatus}
+        onChange={setChangeStatus}
+      />
+      
+      {changeStatus && (
+        <Form.Dropdown id="status" title="New Status" value={statusValue} onChange={setStatusValue}>
+          <Form.Dropdown.Item value="new" title="New" />
+          <Form.Dropdown.Item value="open" title="Open" />
+          <Form.Dropdown.Item value="pending" title="Pending" />
+          <Form.Dropdown.Item value="solved" title="Solved" />
+          <Form.Dropdown.Item value="closed" title="Closed" />
+        </Form.Dropdown>
+      )}
+
+      {/* Priority Action */}
+      <Form.Checkbox
+        id="changePriority"
+        label="Change Priority"
+        value={changePriority}
+        onChange={setChangePriority}
+      />
+      
+      {changePriority && (
+        <Form.Dropdown id="priority" title="New Priority" value={priorityValue} onChange={setPriorityValue}>
+          <Form.Dropdown.Item value="low" title="Low" />
+          <Form.Dropdown.Item value="normal" title="Normal" />
+          <Form.Dropdown.Item value="high" title="High" />
+          <Form.Dropdown.Item value="urgent" title="Urgent" />
+        </Form.Dropdown>
+      )}
+
+      {/* Assignment Action */}
+      <Form.Checkbox
+        id="changeAssignee"
+        label="Change Assignee"
+        value={changeAssignee}
+        onChange={setChangeAssignee}
+      />
+      
+      {changeAssignee && (
+        <Form.Dropdown id="assignee" title="Assign To" value={assigneeValue} onChange={setAssigneeValue}>
+          <Form.Dropdown.Item value="current_user" title="Assign to Me" />
+          <Form.Dropdown.Item value="" title="Unassigned" />
+        </Form.Dropdown>
+      )}
+
+      {/* Comment Action */}
+      <Form.Checkbox
+        id="addComment"
+        label="Add Comment"
+        value={addComment}
+        onChange={setAddComment}
+      />
+      
+      {addComment && (
+        <>
+          <Form.TextArea
+            id="commentBody"
+            title="Comment Text"
+            placeholder="Enter the comment text..."
+            value={commentBody}
+            onChange={setCommentBody}
+          />
+          <Form.Checkbox
+            id="commentPublic"
+            label="Public Comment"
+            value={commentPublic}
+            onChange={setCommentPublic}
+          />
+        </>
+      )}
+
+      <Form.Description text="Create a macro that applies multiple actions to tickets at once. Select the actions you want to include and configure their values." />
+    </Form>
+  );
+}
+
+export default MacroList;

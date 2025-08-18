@@ -2,7 +2,7 @@ import { Action, ActionPanel, List, showToast, Toast, Form, popToRoot } from "@r
 import { readFileSync } from "fs";
 
 import React, { useEffect, useState } from "react";
-import { zdFetch } from "./zendesk";
+import { zdFetch, promoteArticle, archiveArticle, getArticleDetails } from "./zendesk";
 
 interface Article {
   id: number;
@@ -10,6 +10,9 @@ interface Article {
   html_url: string;
   updated_at: string;
   section_id: number;
+  draft?: boolean;
+  archived?: boolean;
+  promoted?: boolean;
 }
 
 interface ArticleSearch {
@@ -118,31 +121,125 @@ export default function HelpCenter() {
   async function searchArticles(q: string) {
     if (!q) {
       setSearchResults([]);
+      setViewType('categories'); // Return to categories when search is cleared
       return;
     }
     setLoading(true);
     try {
-      const res = await zdFetch<ArticleSearch>(
-        `/api/v2/help_center/articles/search.json?query=${encodeURIComponent(q)}`,
-      );
+      // Try with locale first, then fallback to without locale
+      let res;
+      try {
+        res = await zdFetch<ArticleSearch>(
+          `/api/v2/help_center/en-us/articles/search.json?query=${encodeURIComponent(q)}`,
+        );
+      } catch {
+        // Fallback to without locale
+        res = await zdFetch<ArticleSearch>(
+          `/api/v2/help_center/articles/search.json?query=${encodeURIComponent(q)}`,
+        );
+      }
+      
       setSearchResults(res.results);
       setViewType('search');
+      
+      // Show toast with result count for debugging
+      await showToast({
+        style: Toast.Style.Success,
+        title: `Found ${res.results.length} articles`,
+        message: q.length > 20 ? `"${q.substring(0, 20)}..."` : `"${q}"`,
+      });
     } catch (e) {
-      await showToast({ style: Toast.Style.Failure, title: "Failed to search articles", message: String(e) });
+      await showToast({ 
+        style: Toast.Style.Failure, 
+        title: "Failed to search articles", 
+        message: String(e) 
+      });
     } finally {
       setLoading(false);
     }
   }
 
   function getNavigationTitle() {
-    if (searchMode) return "Search Results";
+    if (viewType === 'search') return "Search Results";
     if (viewType === 'categories') return "Help Center";
     if (viewType === 'sections') return selectedCategory?.name || "Sections";
     if (viewType === 'articles') return selectedSection?.name || "Articles";
+    if (searchMode) return "Search Results";
     return "Help Center";
   }
 
+
+
+  async function handlePromoteArticle(articleId: number, articleTitle: string) {
+    try {
+      await showToast({
+        style: Toast.Style.Animated,
+        title: "Promoting article...",
+      });
+
+      await promoteArticle(articleId);
+
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Article promoted",
+        message: `"${articleTitle}" is now featured on the help center homepage`,
+      });
+    } catch (error) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to promote article",
+        message: String(error),
+      });
+    }
+  }
+
+  async function handleArchiveArticle(articleId: number, articleTitle: string) {
+    try {
+      await showToast({
+        style: Toast.Style.Animated,
+        title: "Archiving article...",
+      });
+
+      await archiveArticle(articleId);
+
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Article archived",
+        message: `"${articleTitle}" has been archived`,
+      });
+
+      // Refresh the current view to reflect the change
+      if (searchMode) {
+        // Re-run the search to update results
+        const currentSearch = searchResults.length > 0 ? searchResults[0].title : "";
+        if (currentSearch) {
+          searchArticles(currentSearch);
+        }
+      } else if (viewType === 'articles' && selectedSection) {
+        loadArticles(selectedSection);
+      }
+    } catch (error) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to archive article",
+        message: String(error),
+      });
+    }
+  }
+
   function getBackAction() {
+    if (viewType === 'search') {
+      return (
+        <Action
+          title="Back to Categories"
+          onAction={() => {
+            setViewType('categories');
+            setSearchResults([]);
+          }}
+        />
+      );
+    }
+    
     if (searchMode) {
       return (
         <Action
@@ -206,11 +303,59 @@ export default function HelpCenter() {
           <List.Item
             key={article.id}
             title={article.title}
-            accessories={[{ date: new Date(article.updated_at) }]}
+            accessories={[
+              ...(article.draft ? [{ tag: { value: "Draft", color: "#orange" } }] : []),
+              ...(article.archived ? [{ tag: { value: "Archived", color: "#gray" } }] : []),
+              ...(article.promoted ? [{ tag: { value: "Promoted", color: "#green" } }] : []),
+
+              { date: new Date(article.updated_at) }
+            ]}
             actions={
               <ActionPanel>
-                <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} />} />
+                <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} onPromote={handlePromoteArticle} onArchive={handleArchiveArticle} />} />
                 <Action.OpenInBrowser url={article.html_url} />
+
+                <Action title="Promote Article" icon="⭐" onAction={() => handlePromoteArticle(article.id, article.title)} />
+                <Action title="Archive Article" icon="📦" onAction={() => handleArchiveArticle(article.id, article.title)} />
+                <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
+                {commonActions}
+              </ActionPanel>
+            }
+          />
+        ))}
+      </List>
+    );
+  }
+
+  // Search results view
+  if (viewType === 'search') {
+    return (
+      <List
+        isLoading={loading}
+        searchBarPlaceholder="Search all articles..."
+        onSearchTextChange={searchArticles}
+        throttle
+        navigationTitle={getNavigationTitle()}
+        actions={<ActionPanel>{commonActions}</ActionPanel>}
+      >
+        {searchResults.map((article) => (
+          <List.Item
+            key={article.id}
+            title={article.title}
+            accessories={[
+              ...(article.draft ? [{ tag: { value: "Draft", color: "#orange" } }] : []),
+              ...(article.archived ? [{ tag: { value: "Archived", color: "#gray" } }] : []),
+              ...(article.promoted ? [{ tag: { value: "Promoted", color: "#green" } }] : []),
+
+              { date: new Date(article.updated_at) }
+            ]}
+            actions={
+              <ActionPanel>
+                <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} onPromote={handlePromoteArticle} onArchive={handleArchiveArticle} />} />
+                <Action.OpenInBrowser url={article.html_url} />
+
+                <Action title="Promote Article" icon="⭐" onAction={() => handlePromoteArticle(article.id, article.title)} />
+                <Action title="Archive Article" icon="📦" onAction={() => handleArchiveArticle(article.id, article.title)} />
                 <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
                 {commonActions}
               </ActionPanel>
@@ -227,6 +372,9 @@ export default function HelpCenter() {
       <List
         isLoading={loading}
         navigationTitle={getNavigationTitle()}
+        searchBarPlaceholder="Search all articles..."
+        onSearchTextChange={searchArticles}
+        throttle
         actions={<ActionPanel>{commonActions}</ActionPanel>}
       >
         {categories.map((category) => (
@@ -290,12 +438,21 @@ export default function HelpCenter() {
         <List.Item
           key={article.id}
           title={article.title}
-          accessories={[{ date: new Date(article.updated_at) }]}
+          accessories={[
+            ...(article.draft ? [{ tag: { value: "Draft", color: "#orange" } }] : []),
+            ...(article.archived ? [{ tag: { value: "Archived", color: "#gray" } }] : []),
+            ...(article.promoted ? [{ tag: { value: "Promoted", color: "#green" } }] : []),
+
+            { date: new Date(article.updated_at) }
+          ]}
           icon="📄"
           actions={
             <ActionPanel>
-              <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} />} />
+              <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} onPromote={handlePromoteArticle} onArchive={handleArchiveArticle} />} />
               <Action.OpenInBrowser url={article.html_url} />
+
+              <Action title="Promote Article" icon="⭐" onAction={() => handlePromoteArticle(article.id, article.title)} />
+              <Action title="Archive Article" icon="📦" onAction={() => handleArchiveArticle(article.id, article.title)} />
               <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
               {commonActions}
             </ActionPanel>
@@ -315,7 +472,7 @@ function CreateArticleForm() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [fileLoaded, setFileLoaded] = useState(false);
+  const [, setFileLoaded] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
@@ -447,7 +604,7 @@ function CreateArticleForm() {
         },
       };
 
-      const response = await zdFetch(`/api/v2/help_center/sections/${selectedSectionId}/articles.json`, {
+      await zdFetch(`/api/v2/help_center/sections/${selectedSectionId}/articles.json`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -537,7 +694,15 @@ function CreateArticleForm() {
   );
 }
 
-function EditArticleForm({ articleId }: { articleId: number }) {
+function EditArticleForm({ 
+  articleId,
+  onPromote,
+  onArchive
+}: { 
+  articleId: number;
+  onPromote?: (id: number, title: string) => Promise<void>;
+  onArchive?: (id: number, title: string) => Promise<void>;
+}) {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [markdownContent, setMarkdownContent] = useState("");
@@ -546,6 +711,7 @@ function EditArticleForm({ articleId }: { articleId: number }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
   const [isPublic, setIsPublic] = useState(true);
+  const [articleUrl, setArticleUrl] = useState<string>("");
 
   useEffect(() => {
     loadArticleData();
@@ -564,12 +730,11 @@ function EditArticleForm({ articleId }: { articleId: number }) {
   async function loadArticleData() {
     setLoading(true);
     try {
-      const response = await zdFetch<{ article: { id: number; title: string; body: string; section_id: number; draft: boolean } }>(
-        `/api/v2/help_center/articles/${articleId}.json`
-      );
+      const response = await getArticleDetails(articleId);
       
       const article = response.article;
       setTitle(article.title);
+      setArticleUrl(article.html_url);
       setSelectedSectionId(article.section_id.toString());
       setIsPublic(!article.draft);
       
@@ -727,6 +892,9 @@ function EditArticleForm({ articleId }: { articleId: number }) {
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Update Article" onSubmit={handleSubmit} />
+          {articleUrl && <Action.OpenInBrowser title="View on Website" url={articleUrl} />}
+          {onPromote && <Action title="Promote Article" icon="⭐" onAction={() => onPromote(articleId, title)} />}
+          {onArchive && <Action title="Archive Article" icon="📦" onAction={() => onArchive(articleId, title)} />}
         </ActionPanel>
       }
     >
