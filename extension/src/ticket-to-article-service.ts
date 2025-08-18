@@ -135,23 +135,26 @@ interface ArticleContent {
 }
 
 export class TicketToArticleService {
-  private apiKey: string | null = null;
 
-  constructor() {
-    this.initializeApiKey();
-  }
-
-  private initializeApiKey() {
+  public isEnabled(): boolean {
+    // Check preferences dynamically each time to handle changes
     try {
       const preferences = getPreferenceValues<TicketToArticlePreferences>();
-      this.apiKey = preferences.openaiApiKey || null;
+      return !!(preferences.openaiApiKey && preferences.openaiApiKey.trim());
     } catch (error) {
-      console.error("Failed to load preferences:", error);
+      console.error("Failed to check preferences:", error);
+      return false;
     }
   }
 
-  public isEnabled(): boolean {
-    return !!this.apiKey;
+  private getApiKey(): string | null {
+    try {
+      const preferences = getPreferenceValues<TicketToArticlePreferences>();
+      return preferences.openaiApiKey || null;
+    } catch (error) {
+      console.error("Failed to get API key:", error);
+      return null;
+    }
   }
 
   /**
@@ -248,7 +251,7 @@ export class TicketToArticleService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.apiKey}`,
+          "Authorization": `Bearer ${this.getApiKey()}`,
         },
         body: JSON.stringify({
           model: "gpt-4",

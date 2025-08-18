@@ -68,11 +68,16 @@ export default function TicketToArticle({ ticketId, ticketSubject }: TicketToArt
   }
 
   async function handleSubmit() {
-    if (!ticketToArticleService.isEnabled()) {
+    // Debug: Check what's happening with the API key
+    console.log("Checking if service is enabled...");
+    const isEnabled = ticketToArticleService.isEnabled();
+    console.log("Service enabled:", isEnabled);
+    
+    if (!isEnabled) {
       await showToast({
         style: Toast.Style.Failure,
         title: "OpenAI API Key Required",
-        message: "Please configure your OpenAI API key in extension preferences",
+        message: "Please configure your OpenAI API key in extension preferences. Check console for debug info.",
       });
       return;
     }
