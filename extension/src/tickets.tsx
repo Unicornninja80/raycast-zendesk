@@ -133,20 +133,19 @@ export default function Tickets() {
   function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean, searchTerms?: string) {
     const statusPart = openOnly ? "status:open" : "status:open status:pending status:new";
     
-    // Build search part - use simple text search that Zendesk will handle
-    let searchPart = "";
+    // If there's search text, search across ALL tickets regardless of assignment
     if (searchTerms && searchTerms.trim()) {
       const searchText = searchTerms.trim();
-      // Just append the search text - Zendesk will search across all relevant fields
-      searchPart = ` ${searchText}`;
+      return `type:ticket ${statusPart} ${searchText}`;
     }
-
+    
+    // If no search text, filter by assignment as before
     if (assignmentType === "me") {
-      return `type:ticket assignee:me ${statusPart}${searchPart}`;
+      return `type:ticket assignee:me ${statusPart}`;
     } else if (assignmentType === "group" && groupId) {
-      return `type:ticket group:${groupId} ${statusPart}${searchPart}`;
+      return `type:ticket group:${groupId} ${statusPart}`;
     }
-    return `type:ticket assignee:me ${statusPart}${searchPart}`;
+    return `type:ticket assignee:me ${statusPart}`;
   }
 
   function handleAssignmentTypeChange(type: "me" | "group", groupId?: number) {
@@ -197,7 +196,7 @@ export default function Tickets() {
   return (
     <List
       isLoading={loading}
-      searchBarPlaceholder="Search Zendesk…"
+      searchBarPlaceholder={searchText ? "Searching all tickets..." : "Search tickets by title, description, or requester..."}
       onSearchTextChange={handleSearchTextChange}
       searchBarAccessory={
         <List.Dropdown
