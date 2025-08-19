@@ -23,3 +23,11 @@ node_modules/
 
 # OS specific
 .DS_Store
+
+# Development and IDE folders
+.cursor/
+.taskmaster/
+.todo
+
+# Development scripts
+extension/dev.sh
