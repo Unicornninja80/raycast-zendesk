@@ -133,13 +133,12 @@ export default function Tickets() {
   function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean, searchTerms?: string) {
     const statusPart = openOnly ? "status:open" : "status:open status:pending status:new";
     
-    // Build search part with proper Zendesk search syntax
+    // Build search part - use simple text search that Zendesk will handle
     let searchPart = "";
     if (searchTerms && searchTerms.trim()) {
       const searchText = searchTerms.trim();
-      // Search in subject, description, and requester name
-      // Use OR operator to search across multiple fields
-      searchPart = ` (subject:"${searchText}" OR description:"${searchText}" OR requester:"${searchText}")`;
+      // Just append the search text - Zendesk will search across all relevant fields
+      searchPart = ` ${searchText}`;
     }
 
     if (assignmentType === "me") {
@@ -172,15 +171,19 @@ export default function Tickets() {
   function handleSearchTextChange(text: string) {
     console.log("🔍 Search text changed to:", text);
     setSearchText(text);
+    
+    // Build the new query
+    let newQuery: string;
     if (selectedGroupId) {
-      const newQuery = buildQuery("group", selectedGroupId, onlyOpenTickets, text);
+      newQuery = buildQuery("group", selectedGroupId, onlyOpenTickets, text);
       console.log("🔍 New query (group):", newQuery);
-      setQuery(newQuery);
     } else {
-      const newQuery = buildQuery("me", undefined, onlyOpenTickets, text);
+      newQuery = buildQuery("me", undefined, onlyOpenTickets, text);
       console.log("🔍 New query (me):", newQuery);
-      setQuery(newQuery);
     }
+    
+    console.log("🔍 Setting query to:", newQuery);
+    setQuery(newQuery);
   }
 
   useEffect(() => {
@@ -196,7 +199,6 @@ export default function Tickets() {
       isLoading={loading}
       searchBarPlaceholder="Search Zendesk…"
       onSearchTextChange={handleSearchTextChange}
-      throttle
       searchBarAccessory={
         <List.Dropdown
           tooltip="Select Assignment"
