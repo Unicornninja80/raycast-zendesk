@@ -106,11 +106,13 @@ export default function Tickets() {
       return;
     }
     
+    console.log("🔍 Loading tickets with query:", q);
     setLoading(true);
     try {
       const data = await zdFetch<SearchResponse>(
         `/api/v2/search.json?query=${encodeURIComponent(q)}&sort_by=updated_at&sort_order=desc`,
       );
+      console.log(`📊 Found ${data.results.length} total results, ${data.results.filter((r) => r.result_type === "ticket").length} tickets`);
       setTickets(data.results.filter((r) => r.result_type === "ticket"));
     } catch (e) {
       await showFailureToast(e, { title: "Failed to load tickets" });
@@ -130,7 +132,15 @@ export default function Tickets() {
 
   function buildQuery(assignmentType: "me" | "group", groupId?: number, openOnly?: boolean, searchTerms?: string) {
     const statusPart = openOnly ? "status:open" : "status:open status:pending status:new";
-    const searchPart = searchTerms && searchTerms.trim() ? ` ${searchTerms.trim()}` : "";
+    
+    // Build search part with proper Zendesk search syntax
+    let searchPart = "";
+    if (searchTerms && searchTerms.trim()) {
+      const searchText = searchTerms.trim();
+      // Search in subject, description, and requester name
+      // Use OR operator to search across multiple fields
+      searchPart = ` (subject:"${searchText}" OR description:"${searchText}" OR requester:"${searchText}")`;
+    }
 
     if (assignmentType === "me") {
       return `type:ticket assignee:me ${statusPart}${searchPart}`;
@@ -160,11 +170,16 @@ export default function Tickets() {
   }
 
   function handleSearchTextChange(text: string) {
+    console.log("🔍 Search text changed to:", text);
     setSearchText(text);
     if (selectedGroupId) {
-      setQuery(buildQuery("group", selectedGroupId, onlyOpenTickets, text));
+      const newQuery = buildQuery("group", selectedGroupId, onlyOpenTickets, text);
+      console.log("🔍 New query (group):", newQuery);
+      setQuery(newQuery);
     } else {
-      setQuery(buildQuery("me", undefined, onlyOpenTickets, text));
+      const newQuery = buildQuery("me", undefined, onlyOpenTickets, text);
+      console.log("🔍 New query (me):", newQuery);
+      setQuery(newQuery);
     }
   }
 
