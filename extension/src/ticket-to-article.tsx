@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Action, ActionPanel, Form, showToast, Toast, popToRoot, List } from "@raycast/api";
+import { Action, ActionPanel, Form, popToRoot, List } from "@raycast/api";
 import { zdFetch } from "./zendesk";
 import { ticketToArticleService } from "./ticket-to-article-service";
+import { 
+  CategorySectionDropdowns,
+  FormSection,
+  FormSeparator,
+  showErrorToast,
+  handleError,
+  withErrorHandling
+} from "./components/common";
 
 interface TicketToArticleProps {
   ticketId: number;
@@ -46,11 +54,7 @@ export default function TicketToArticle({ ticketId, ticketSubject }: TicketToArt
       const response = await zdFetch<{ categories: Category[] }>("/api/v2/help_center/categories.json");
       setCategories(response.categories);
     } catch (error) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to load categories",
-        message: String(error),
-      });
+      await handleError(error, "Load categories");
     }
   }
 
@@ -59,11 +63,7 @@ export default function TicketToArticle({ ticketId, ticketSubject }: TicketToArt
       const response = await zdFetch<{ sections: Section[] }>(`/api/v2/help_center/categories/${categoryId}/sections.json`);
       setSections(response.sections);
     } catch (error) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to load sections",
-        message: String(error),
-      });
+      await handleError(error, "Load sections");
     }
   }
 
@@ -74,48 +74,39 @@ export default function TicketToArticle({ ticketId, ticketSubject }: TicketToArt
     console.log("Service enabled:", isEnabled);
     
     if (!isEnabled) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "OpenAI API Key Required",
-        message: "Please configure your OpenAI API key in extension preferences. Check console for debug info.",
-      });
+      await showErrorToast(
+        "OpenAI API Key Required",
+        "Please configure your OpenAI API key in extension preferences. Check console for debug info."
+      );
       return;
     }
 
     if (!selectedSectionId) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Section Required",
-        message: "Please select a section for the new article",
-      });
+      await showErrorToast("Section Required", "Please select a section for the new article");
       return;
     }
 
     setIsLoading(true);
 
-    try {
-      const result = await ticketToArticleService.convertTicketToArticle(
-        ticketId,
-        parseInt(selectedSectionId)
-      );
+    const result = await withErrorHandling(
+      async () => {
+        return await ticketToArticleService.convertTicketToArticle(
+          ticketId,
+          parseInt(selectedSectionId)
+        );
+      },
+      "Create article",
+      {
+        showSuccess: true,
+        successMessage: "Article created as a draft for review",
+      }
+    );
 
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Article Created Successfully!",
-        message: `"${result.article.title}" has been created as a draft for review`,
-      });
-
+    if (result) {
       popToRoot();
-    } catch (error) {
-      console.error("Failed to convert ticket to article:", error);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to Create Article",
-        message: String(error),
-      });
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   }
 
   if (!ticketToArticleService.isEnabled()) {
@@ -147,48 +138,25 @@ export default function TicketToArticle({ ticketId, ticketSubject }: TicketToArt
         </ActionPanel>
       }
     >
-      <Form.Description
+      <FormSection
         title="Convert Ticket to Article"
-        text={`This will analyze ticket #${ticketId} "${ticketSubject}" and automatically generate a comprehensive help center article using AI.`}
-      />
-      
-      <Form.Separator />
-
-      <Form.Dropdown
-        id="category"
-        title="Target Category"
-        placeholder="Select a category..."
-        value={selectedCategoryId}
-        onChange={setSelectedCategoryId}
+        description={`This will analyze ticket #${ticketId} "${ticketSubject}" and automatically generate a comprehensive help center article using AI.`}
       >
-        <Form.Dropdown.Item value="" title="Select Category..." />
-        {categories.map((category) => (
-          <Form.Dropdown.Item
-            key={category.id}
-            value={category.id.toString()}
-            title={category.name}
-          />
-        ))}
-      </Form.Dropdown>
+        <CategorySectionDropdowns
+          categories={categories}
+          sections={sections}
+          selectedCategoryId={selectedCategoryId}
+          selectedSectionId={selectedSectionId}
+          onCategoryChange={setSelectedCategoryId}
+          onSectionChange={setSelectedSectionId}
+          categoryTitle="Target Category"
+          sectionTitle="Target Section"
+          categoryPlaceholder="Select a category..."
+          sectionPlaceholder="Select a section..."
+        />
+      </FormSection>
 
-      <Form.Dropdown
-        id="section"
-        title="Target Section"
-        placeholder={selectedCategoryId ? "Select a section..." : "Select a category first"}
-        value={selectedSectionId}
-        onChange={setSelectedSectionId}
-      >
-        <Form.Dropdown.Item value="" title="Select Section..." />
-        {sections.map((section) => (
-          <Form.Dropdown.Item
-            key={section.id}
-            value={section.id.toString()}
-            title={section.name}
-          />
-        ))}
-      </Form.Dropdown>
-
-      <Form.Separator />
+      <FormSeparator />
 
       <Form.Description
         title="What This Will Do"

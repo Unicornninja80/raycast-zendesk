@@ -92,7 +92,7 @@ export default function Dashboard() {
           solved: solvedResponse.results.length,
           submitted: submittedResponse.results.length,
         });
-      } catch (e) {
+      } catch {
         days.push({
           date: dateStr,
           solved: 0,

@@ -457,13 +457,13 @@ Remember: Create a generic troubleshooting guide that any future person with thi
       }
       
       // Clean up the title - remove any JSON artifacts
-      let cleanTitle = parsed.title.replace(/^[\{\[\"\s]+|[\}\]\"\s]+$/g, '').trim();
+      let cleanTitle = parsed.title.replace(/^[{["\s]+|[}]"\s]+$/g, '').trim();
       
       // Clean up the body - ensure it's properly formatted markdown
       let cleanBody = parsed.body;
       if (typeof cleanBody === 'string') {
         // Remove any JSON wrapper artifacts
-        cleanBody = cleanBody.replace(/^[\{\[\"\s]+|[\}\]\"\s]+$/g, '').trim();
+        cleanBody = cleanBody.replace(/^[{["\s]+|[}]"\s]+$/g, '').trim();
         
         // Fix markdown formatting issues
         cleanBody = cleanBody

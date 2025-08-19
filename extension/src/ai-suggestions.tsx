@@ -12,6 +12,7 @@ import React, { useEffect, useState } from "react";
 import { MacroSuggestion } from "./ai-service";
 import { ticketMonitor } from "./ticket-monitor";
 import { createMacro } from "./zendesk";
+import { AISuggestionListItem } from "./components/common";
 
 export interface AISuggestionsProps {
   onRefresh?: () => void;
@@ -90,18 +91,7 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({ onRefresh }) => {
     });
   }
 
-  const getConfidenceIcon = (confidence: number): string => {
-    if (confidence >= 0.8) return "🟢";
-    if (confidence >= 0.6) return "🟡";
-    return "🟠";
-  };
 
-  const getConfidenceText = (confidence: number): string => {
-    const percentage = Math.round(confidence * 100);
-    if (confidence >= 0.8) return `${percentage}% - High`;
-    if (confidence >= 0.6) return `${percentage}% - Medium`;
-    return `${percentage}% - Low`;
-  };
 
   return (
     <List
@@ -128,17 +118,12 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({ onRefresh }) => {
       )}
 
       {suggestions.map((suggestion, index) => (
-        <List.Item
-          key={index}
+        <AISuggestionListItem
+          index={index}
           title={suggestion.title}
-          subtitle={suggestion.description}
-          accessories={[
-            { 
-              text: getConfidenceText(suggestion.confidence),
-              icon: getConfidenceIcon(suggestion.confidence)
-            },
-            { text: `${suggestion.actions.length} actions` }
-          ]}
+          description={suggestion.description}
+          confidence={suggestion.confidence}
+          actionsCount={suggestion.actions.length}
           actions={
             <ActionPanel>
               <Action

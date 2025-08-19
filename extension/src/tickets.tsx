@@ -14,6 +14,16 @@ import React, { useEffect, useState } from "react";
 import { zdFetch, getAgentTicketUrl, getCurrentUserId, getAuthHeader } from "./zendesk";
 import { MacroList } from "./macros";
 import { TicketToArticleAction } from "./ticket-to-article";
+import { 
+  StatusDropdown, 
+  TicketManagementActions, 
+  TicketListItem,
+  FormSeparator,
+  FieldGroup,
+  StatusIndicator,
+  withErrorHandling
+} from "./components/common";
+import { open } from "@raycast/api";
 
 interface Ticket {
   id: number;
@@ -203,31 +213,28 @@ export default function Tickets() {
       }
     >
       {tickets.map((t: Ticket) => (
-        <List.Item
-          key={t.id}
+        <TicketListItem
+          id={t.id}
           title={t.subject || `Ticket #${t.id}`}
-          accessories={[{ tag: t.status }, { date: new Date(t.updated_at) }]}
+          status={t.status}
+          updatedAt={t.updated_at}
           actions={
             <ActionPanel>
-              <Action.Push title="View Details" target={<TicketDetails ticketId={t.id} />} />
-              <Action.OpenInBrowser url={getAgentTicketUrl(t.id)} />
-              <Action.Push title="Manage Ticket" target={<ManageTicketForm ticketId={t.id} />} />
-              <Action.Push 
-                title="Apply Macro" 
-                icon="⚡" 
-                target={<MacroList ticketId={t.id} onMacroApplied={() => load(query)} />} 
-                shortcut={{ modifiers: ["cmd"], key: "m" }}
+              <TicketManagementActions
+                onAssignToMe={() => assignToMe(t.id)}
+                onMarkAsSolved={() => updateStatus(t.id, "solved")}
+                onMarkAsPending={() => updateStatus(t.id, "pending")}
+                onOpenInBrowser={() => open(getAgentTicketUrl(t.id))}
+                onManageTicket={<TicketDetails ticketId={t.id} />}
+                onApplyMacro={<MacroList ticketId={t.id} onMacroApplied={() => load(query)} />}
+                onConvertToArticle={<TicketToArticleAction ticketId={t.id} ticketSubject={t.subject} />}
               />
-              <TicketToArticleAction ticketId={t.id} ticketSubject={t.subject} />
-              <Action title="Assign to Me" onAction={() => assignToMe(t.id)} />
-              <Action title="Mark as Solved" onAction={() => updateStatus(t.id, "solved")} />
               <Action
                 title={onlyOpenTickets ? "Show All Tickets" : "Only Open Tickets"}
                 icon={onlyOpenTickets ? "❌" : "✅"}
                 onAction={() => handleOpenTicketsToggle(!onlyOpenTickets)}
                 shortcut={{ modifiers: ["cmd"], key: "o" }}
               />
-              <Action title="Mark as Pending" onAction={() => updateStatus(t.id, "pending")} />
             </ActionPanel>
           }
         />
@@ -249,7 +256,7 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+
   const [systemFieldValue, setSystemFieldValue] = useState<string>("");
   const [issueFieldValue, setIssueFieldValue] = useState<string>("");
   
@@ -529,14 +536,11 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
     >
       <Form.Description title={`Manage Ticket #${ticketId}`} text={ticket.subject || ""} />
       
-      {/* Ticket Status and Assignment */}
-      <Form.Dropdown id="status" title="Status" value={selectedStatus} onChange={setSelectedStatus}>
-        <Form.Dropdown.Item value="new" title="New" />
-        <Form.Dropdown.Item value="open" title="Open" />
-        <Form.Dropdown.Item value="pending" title="Pending" />
-        <Form.Dropdown.Item value="solved" title="Solved" />
-        <Form.Dropdown.Item value="closed" title="Closed" />
-      </Form.Dropdown>
+            {/* Ticket Status and Assignment */}
+      <StatusDropdown
+        value={selectedStatus}
+        onChange={setSelectedStatus}
+      />
 
       <Form.Dropdown id="assignee" title="Assignee" value={selectedAssigneeId} onChange={setSelectedAssigneeId}>
         <Form.Dropdown.Item value="" title="Unassigned" />
@@ -562,65 +566,87 @@ function ManageTicketForm({ ticketId }: { ticketId: number }) {
         </Form.Dropdown>
       )}
 
-      <Form.Separator />
+      <FormSeparator />
 
       {/* Reply Section */}
-      <Form.Description title="Add Reply (Optional)" text="Leave blank to only update ticket properties" />
-      
-      <Form.Checkbox id="public" label="Public Reply" value={isPublic} onChange={setIsPublic} />
-      
-      <Form.TextArea
-        id="body"
-        title="Message"
-        value={text}
-        onChange={setText}
-        enableMarkdown
-        placeholder="Type your reply…"
-      />
-      
-      <Form.FilePicker
-        id="images"
-        title="📎 Image Attachments"
-        allowMultipleSelection={true}
-        value={[]}
-        onChange={handleFileSelection}
-        canChooseDirectories={false}
-        canChooseFiles={true}
-        showHiddenFiles={false}
-        info="Click to select images or drag files onto Raycast"
-      />
-      
-      {attachments.length > 0 && (
-        <Form.Description title="Uploaded Images" text={`${attachments.length} image(s) ready to attach`} />
-      )}
-      {uploading && <Form.Description title="Status" text="Uploading images..." />}
+      <FieldGroup
+        title="Add Reply (Optional)"
+        description="Leave blank to only update ticket properties"
+      >
+        <Form.Checkbox id="public" label="Public Reply" value={isPublic} onChange={setIsPublic} />
+        
+        <Form.TextArea
+          id="body"
+          title="Message"
+          value={text}
+          onChange={setText}
+          enableMarkdown
+          placeholder="Type your reply…"
+        />
+        
+        <Form.FilePicker
+          id="images"
+          title="📎 Image Attachments"
+          allowMultipleSelection={true}
+          value={[]}
+          onChange={handleFileSelection}
+          canChooseDirectories={false}
+          canChooseFiles={true}
+          showHiddenFiles={false}
+          info="Click to select images or drag files onto Raycast"
+        />
+        
+        {attachments.length > 0 && (
+          <StatusIndicator 
+            title="Uploaded Images" 
+            text={`${attachments.length} image(s) ready to attach`} 
+          />
+        )}
+        {uploading && (
+          <StatusIndicator 
+            title="Status" 
+            text="Uploading images" 
+            isLoading={true}
+          />
+        )}
+      </FieldGroup>
     </Form>
   );
 }
 
 async function assignToMe(ticketId: number) {
-  try {
-    const me = await getCurrentUserId();
-    await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
-      method: "PUT",
-      body: JSON.stringify({ ticket: { assignee_id: me } }),
-    });
-    await showToast({ style: Toast.Style.Success, title: "Assigned to you" });
-  } catch (e) {
-    await showFailureToast(e, { title: "Failed to assign" });
-  }
+  await withErrorHandling(
+    async () => {
+      const me = await getCurrentUserId();
+      await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
+        method: "PUT",
+        body: JSON.stringify({ ticket: { assignee_id: me } }),
+      });
+    },
+    "Assign ticket",
+    {
+      showSuccess: true,
+      successMessage: "Assigned to you",
+      useFailureToast: true,
+    }
+  );
 }
 
 async function updateStatus(ticketId: number, status: "pending" | "solved" | "open" | "hold") {
-  try {
-    await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
-      method: "PUT",
-      body: JSON.stringify({ ticket: { status } }),
-    });
-    await showToast({ style: Toast.Style.Success, title: `Marked ${status}` });
-  } catch (e) {
-    await showFailureToast(e, { title: "Failed to update status" });
-  }
+  await withErrorHandling(
+    async () => {
+      await zdFetch(`/api/v2/tickets/${ticketId}.json`, {
+        method: "PUT",
+        body: JSON.stringify({ ticket: { status } }),
+      });
+    },
+    "Update status",
+    {
+      showSuccess: true,
+      successMessage: `Marked ${status}`,
+      useFailureToast: true,
+    }
+  );
 }
 
 function TicketDetails({ ticketId }: { ticketId: number }) {

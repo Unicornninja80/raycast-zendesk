@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 
 import React, { useEffect, useState } from "react";
 import { zdFetch, promoteArticle, archiveArticle, getArticleDetails } from "./zendesk";
+import { ArticleManagementActions } from "./components/common";
 
 interface Article {
   id: number;
@@ -351,12 +352,14 @@ export default function HelpCenter() {
             ]}
             actions={
               <ActionPanel>
-                <Action.Push title="Edit Article" target={<EditArticleForm articleId={article.id} onPromote={handlePromoteArticle} onArchive={handleArchiveArticle} />} />
-                <Action.OpenInBrowser url={article.html_url} />
-
-                <Action title="Promote Article" icon="⭐" onAction={() => handlePromoteArticle(article.id, article.title)} />
-                <Action title="Archive Article" icon="📦" onAction={() => handleArchiveArticle(article.id, article.title)} />
-                <Action.CopyToClipboard title="Copy Article URL" content={article.html_url} />
+                <ArticleManagementActions
+                  articleId={article.id}
+                  articleTitle={article.title}
+                  htmlUrl={article.html_url}
+                  onEdit={<EditArticleForm articleId={article.id} onPromote={handlePromoteArticle} onArchive={handleArchiveArticle} />}
+                  onPromote={handlePromoteArticle}
+                  onArchive={handleArchiveArticle}
+                />
                 {commonActions}
               </ActionPanel>
             }

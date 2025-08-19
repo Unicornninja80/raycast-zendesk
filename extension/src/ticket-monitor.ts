@@ -117,7 +117,7 @@ class TicketMonitor {
       const resolutionComment = this.findResolutionComment(comments, await getCurrentUserId());
 
       // Extract the sequence of actions taken to resolve the ticket
-      const assigneeActions = this.extractAssigneeActions(history, await getCurrentUserId());
+      const assigneeActions = this.extractAssigneeActions(history);
 
       // Build the ticket analysis object
       const ticketAnalysis: TicketAnalysis = {
@@ -180,7 +180,7 @@ class TicketMonitor {
     return agentComments[0] || null;
   }
 
-  private extractAssigneeActions(history: TicketHistory, _agentId: number): Array<{
+  private extractAssigneeActions(history: TicketHistory): Array<{
     field: string;
     from_value: string | number | boolean | null;
     to_value: string | number | boolean | null;

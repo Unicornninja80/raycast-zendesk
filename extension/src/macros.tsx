@@ -21,6 +21,17 @@ import {
 } from "./zendesk";
 import AISuggestions from "./ai-suggestions";
 import ZendeskPlaceholders from "./zendesk-placeholders";
+import { 
+  StatusDropdown, 
+  PriorityDropdown, 
+  MacroListItem,
+  ConditionalFieldGroup,
+  FormSeparator,
+  showErrorToast,
+  showWarningToast,
+  handleError,
+  withErrorHandling
+} from "./components/common";
 
 // Wrapper component to handle the props issue
 function AISuggestionsWrapper({ onRefresh }: { onRefresh?: () => Promise<void> }) {
@@ -46,11 +57,7 @@ export function MacroList({ ticketId, onMacroApplied }: MacroListProps) {
       const macrosList = await getMacros();
       setMacros(macrosList);
     } catch (e) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to load macros",
-        message: String(e),
-      });
+      await handleError(e, "Load macros");
     } finally {
       setLoading(false);
     }
@@ -58,38 +65,27 @@ export function MacroList({ ticketId, onMacroApplied }: MacroListProps) {
 
   async function handleApplyMacro(macroId: number, macroTitle: string) {
     if (!ticketId) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "No ticket selected",
-        message: "Cannot apply macro without a ticket",
-      });
+      await showErrorToast("No ticket selected", "Cannot apply macro without a ticket");
       return;
     }
 
-    try {
-      await showToast({
-        style: Toast.Style.Animated,
-        title: `Applying macro: ${macroTitle}`,
-      });
+    const result = await withErrorHandling(
+      async () => {
+        await applyMacro(ticketId, macroId);
+      },
+      "Apply macro",
+      {
+        showLoading: true,
+        showSuccess: true,
+        successMessage: `Applied "${macroTitle}" to ticket #${ticketId}`,
+      }
+    );
 
-      await applyMacro(ticketId, macroId);
-      
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Macro applied successfully",
-        message: `Applied "${macroTitle}" to ticket #${ticketId}`,
-      });
-
+    if (result !== null) {
       if (onMacroApplied) {
         onMacroApplied();
       }
       popToRoot();
-    } catch (e) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to apply macro",
-        message: String(e),
-      });
     }
   }
 
@@ -113,14 +109,12 @@ export function MacroList({ ticketId, onMacroApplied }: MacroListProps) {
       }
     >
       {macros.map((macro) => (
-        <List.Item
-          key={macro.id}
+        <MacroListItem
+          id={macro.id}
           title={macro.title}
-          subtitle={macro.description}
-          accessories={[
-            { text: `${macro.actions.length} actions` },
-            { date: new Date(macro.updated_at) }
-          ]}
+          description={macro.description}
+          actionsCount={macro.actions.length}
+          updatedAt={macro.updated_at}
           actions={
             <ActionPanel>
               {ticketId && (
@@ -407,11 +401,7 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
 
   async function handleSubmit() {
     if (!title.trim()) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Title required",
-        message: "Please enter a title for the macro",
-      });
+      await showErrorToast("Title required", "Please enter a title for the macro");
       return;
     }
 
@@ -463,70 +453,60 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
     }
 
     if (actions.length === 0) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "No actions defined",
-        message: "Please define at least one action for the macro",
-      });
+      await showErrorToast("No actions defined", "Please define at least one action for the macro");
       return;
     }
 
     setLoading(true);
 
-    try {
-      const macroData = {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        actions,
-      };
-      
-      console.log("Creating macro with data:", JSON.stringify(macroData, null, 2));
-      console.log("Individual actions:", actions);
-      
-      const result = await createMacro(macroData);
-      console.log("Macro creation result:", result);
+    const result = await withErrorHandling(
+      async () => {
+        const macroData = {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          actions,
+        };
+        
+        console.log("Creating macro with data:", JSON.stringify(macroData, null, 2));
+        console.log("Individual actions:", actions);
+        
+        const result = await createMacro(macroData);
+        console.log("Macro creation result:", result);
+        
+        // Verify the macro was actually created by trying to fetch it
+        setTimeout(async () => {
+          try {
+            const updatedMacros = await getMacros();
+            const createdMacro = updatedMacros.find(m => m.title === title.trim());
+            if (createdMacro) {
+              console.log("Macro verification successful:", createdMacro);
+            } else {
+              console.warn("Macro not found in updated list - creation may have failed silently");
+              await showWarningToast("Warning", "Macro may not have been saved properly");
+            }
+          } catch (error) {
+            console.error("Failed to verify macro creation:", error);
+          }
+        }, 2000);
+        
+        return result;
+      },
+      "Create macro",
+      {
+        showLoading: true,
+        showSuccess: true,
+        successMessage: `Created macro: ${title}`,
+      }
+    );
 
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Macro created successfully",
-        message: `Created macro: ${title} (ID: ${result.macro.id})`,
-      });
-
+    if (result) {
       if (onMacroCreated) {
         await onMacroCreated();
       }
-      
-      // Verify the macro was actually created by trying to fetch it
-      setTimeout(async () => {
-        try {
-          const updatedMacros = await getMacros();
-          const createdMacro = updatedMacros.find(m => m.title === title.trim());
-          if (createdMacro) {
-            console.log("Macro verification successful:", createdMacro);
-          } else {
-            console.warn("Macro not found in updated list - creation may have failed silently");
-            await showToast({
-              style: Toast.Style.Failure,
-              title: "Warning",
-              message: "Macro may not have been saved properly",
-            });
-          }
-        } catch (error) {
-          console.error("Failed to verify macro creation:", error);
-        }
-      }, 2000);
-      
       popToRoot();
-    } catch (e) {
-      console.error("Macro creation error:", e);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to create macro",
-        message: String(e),
-      });
-    } finally {
-      setLoading(false);
     }
+    
+    setLoading(false);
   }
 
   return (
@@ -560,144 +540,125 @@ function CreateMacroForm({ onMacroCreated }: CreateMacroFormProps) {
         onChange={setDescription}
       />
 
-      <Form.Separator />
+      <FormSeparator />
 
       {/* Status Action */}
-      <Form.Checkbox
-        id="changeStatus"
-        label="Change Status"
-        value={changeStatus}
-        onChange={setChangeStatus}
-      />
-      
-      {changeStatus && (
-        <Form.Dropdown id="status" title="New Status" value={statusValue} onChange={setStatusValue}>
-          <Form.Dropdown.Item value="new" title="New" />
-          <Form.Dropdown.Item value="open" title="Open" />
-          <Form.Dropdown.Item value="pending" title="Pending" />
-          <Form.Dropdown.Item value="solved" title="Solved" />
-          <Form.Dropdown.Item value="closed" title="Closed" />
-        </Form.Dropdown>
-      )}
+      <ConditionalFieldGroup
+        checkboxId="changeStatus"
+        checkboxLabel="Change Status"
+        checkboxValue={changeStatus}
+        onCheckboxChange={setChangeStatus}
+      >
+        <StatusDropdown
+          id="status"
+          title="New Status"
+          value={statusValue}
+          onChange={setStatusValue}
+        />
+      </ConditionalFieldGroup>
 
       {/* Priority Action */}
-      <Form.Checkbox
-        id="changePriority"
-        label="Change Priority"
-        value={changePriority}
-        onChange={setChangePriority}
-      />
-      
-      {changePriority && (
-        <Form.Dropdown id="priority" title="New Priority" value={priorityValue} onChange={setPriorityValue}>
-          <Form.Dropdown.Item value="low" title="Low" />
-          <Form.Dropdown.Item value="normal" title="Normal" />
-          <Form.Dropdown.Item value="high" title="High" />
-          <Form.Dropdown.Item value="urgent" title="Urgent" />
-        </Form.Dropdown>
-      )}
+      <ConditionalFieldGroup
+        checkboxId="changePriority"
+        checkboxLabel="Change Priority"
+        checkboxValue={changePriority}
+        onCheckboxChange={setChangePriority}
+      >
+        <PriorityDropdown
+          id="priority"
+          title="New Priority"
+          value={priorityValue}
+          onChange={setPriorityValue}
+        />
+      </ConditionalFieldGroup>
 
       {/* Assignment Action */}
-      <Form.Checkbox
-        id="changeAssignee"
-        label="Change Assignee"
-        value={changeAssignee}
-        onChange={setChangeAssignee}
-      />
-      
-      {changeAssignee && (
+      <ConditionalFieldGroup
+        checkboxId="changeAssignee"
+        checkboxLabel="Change Assignee"
+        checkboxValue={changeAssignee}
+        onCheckboxChange={setChangeAssignee}
+      >
         <Form.Dropdown id="assignee" title="Assign To" value={assigneeValue} onChange={setAssigneeValue}>
           <Form.Dropdown.Item value="current_user" title="Assign to Me" />
           <Form.Dropdown.Item value="" title="Unassigned" />
         </Form.Dropdown>
-      )}
+      </ConditionalFieldGroup>
 
-      <Form.Separator />
+      <FormSeparator />
 
       {/* Custom Fields */}
       {preferences.enableSystemField && preferences.systemFieldId && (
-        <>
-          <Form.Checkbox
-            id="changeSystemField"
-            label="Set System Field"
-            value={changeSystemField}
-            onChange={setChangeSystemField}
-          />
-          
-          {changeSystemField && (
-            <Form.Dropdown 
-              id="systemField" 
-              title="System Field Value" 
-              value={systemFieldValue} 
-              onChange={setSystemFieldValue}
-            >
-              <Form.Dropdown.Item value="" title="Select System..." />
-              {systemFieldOptions.map((option) => (
-                <Form.Dropdown.Item
-                  key={option.id}
-                  value={option.value}
-                  title={option.name}
-                />
-              ))}
-            </Form.Dropdown>
-          )}
-        </>
+        <ConditionalFieldGroup
+          checkboxId="changeSystemField"
+          checkboxLabel="Set System Field"
+          checkboxValue={changeSystemField}
+          onCheckboxChange={setChangeSystemField}
+        >
+          <Form.Dropdown 
+            id="systemField" 
+            title="System Field Value" 
+            value={systemFieldValue} 
+            onChange={setSystemFieldValue}
+          >
+            <Form.Dropdown.Item value="" title="Select System..." />
+            {systemFieldOptions.map((option) => (
+              <Form.Dropdown.Item
+                key={option.id}
+                value={option.value}
+                title={option.name}
+              />
+            ))}
+          </Form.Dropdown>
+        </ConditionalFieldGroup>
       )}
 
       {preferences.enableIssueField && preferences.issueFieldId && (
-        <>
-          <Form.Checkbox
-            id="changeIssueField"
-            label="Set Issue Field"
-            value={changeIssueField}
-            onChange={setChangeIssueField}
-          />
-          
-          {changeIssueField && (
-            <Form.Dropdown 
-              id="issueField" 
-              title="Issue Field Value" 
-              value={issueFieldValue} 
-              onChange={setIssueFieldValue}
-            >
-              <Form.Dropdown.Item value="" title="Select Issue..." />
-              {issueFieldOptions.map((option) => (
-                <Form.Dropdown.Item
-                  key={option.id}
-                  value={option.value}
-                  title={option.name}
-                />
-              ))}
-            </Form.Dropdown>
-          )}
-        </>
+        <ConditionalFieldGroup
+          checkboxId="changeIssueField"
+          checkboxLabel="Set Issue Field"
+          checkboxValue={changeIssueField}
+          onCheckboxChange={setChangeIssueField}
+        >
+          <Form.Dropdown 
+            id="issueField" 
+            title="Issue Field Value" 
+            value={issueFieldValue} 
+            onChange={setIssueFieldValue}
+          >
+            <Form.Dropdown.Item value="" title="Select Issue..." />
+            {issueFieldOptions.map((option) => (
+              <Form.Dropdown.Item
+                key={option.id}
+                value={option.value}
+                title={option.name}
+              />
+            ))}
+          </Form.Dropdown>
+        </ConditionalFieldGroup>
       )}
 
       {/* Comment Action */}
-      <Form.Checkbox
-        id="addComment"
-        label="Add Comment"
-        value={addComment}
-        onChange={setAddComment}
-      />
-      
-      {addComment && (
-        <>
-          <Form.TextArea
-            id="commentBody"
-            title="Comment Text"
-            placeholder="Enter the comment text..."
-            value={commentBody}
-            onChange={setCommentBody}
-          />
-          <Form.Checkbox
-            id="commentPublic"
-            label="Public Comment"
-            value={commentPublic}
-            onChange={setCommentPublic}
-          />
-        </>
-      )}
+      <ConditionalFieldGroup
+        checkboxId="addComment"
+        checkboxLabel="Add Comment"
+        checkboxValue={addComment}
+        onCheckboxChange={setAddComment}
+      >
+        <Form.TextArea
+          id="commentBody"
+          title="Comment Text"
+          placeholder="Enter the comment text..."
+          value={commentBody}
+          onChange={setCommentBody}
+        />
+        <Form.Checkbox
+          id="commentPublic"
+          label="Public Comment"
+          value={commentPublic}
+          onChange={setCommentPublic}
+        />
+      </ConditionalFieldGroup>
 
       <Form.Description text="Create a macro that applies multiple actions to tickets at once. Select the actions you want to include and configure their values." />
     </Form>

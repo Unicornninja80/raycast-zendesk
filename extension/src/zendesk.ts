@@ -17,7 +17,7 @@ export function getAuthHeader(): string {
   return `Basic ${token}`;
 }
 
-export async function zdFetch<T>(path: string, init: RequestInit = {} as RequestInit): Promise<T> {
+export async function zdFetch<T>(path: string, init: any = {}): Promise<T> {
   const res = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
