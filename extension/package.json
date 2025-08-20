@@ -134,6 +134,20 @@
       "subtitle": "Zendesk",
       "description": "Search Help Center articles and create new articles from Markdown",
       "mode": "view"
+    },
+    {
+      "name": "ticket-to-article",
+      "title": "Convert to Article",
+      "subtitle": "Zendesk",
+      "description": "Convert a resolved ticket to a Help Center article using AI",
+      "mode": "view"
+    },
+    {
+      "name": "zendesk-placeholders",
+      "title": "Zendesk Placeholders",
+      "subtitle": "Zendesk",
+      "description": "Reference guide for Zendesk template variables and placeholders",
+      "mode": "view"
     }
   ],
   "scripts": {
