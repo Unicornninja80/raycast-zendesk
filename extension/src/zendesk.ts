@@ -101,8 +101,16 @@ export async function getMacros(): Promise<Macro[]> {
 
 // Apply a macro to a ticket
 export async function applyMacro(ticketId: number, macroId: number): Promise<MacroApplicationResponse> {
-  return await zdFetch<MacroApplicationResponse>(`/api/v2/tickets/${ticketId}/macros/${macroId}/apply.json`, {
-    method: "PUT"
+  return await zdFetch<MacroApplicationResponse>(`/api/v2/macros/${macroId}/apply.json`, {
+    method: "POST",
+    body: JSON.stringify({
+      macro: {
+        id: macroId
+      },
+      ticket: {
+        id: ticketId
+      }
+    })
   });
 }
 
@@ -131,7 +139,17 @@ export async function createMacro(macroData: {
 
 // Get macro preview (what would happen if applied)
 export async function getMacroPreview(ticketId: number, macroId: number) {
-  return await zdFetch<MacroApplicationResponse>(`/api/v2/tickets/${ticketId}/macros/${macroId}/apply.json?get_changes_only=true`);
+  return await zdFetch<MacroApplicationResponse>(`/api/v2/macros/${macroId}/apply.json?get_changes_only=true`, {
+    method: "POST",
+    body: JSON.stringify({
+      macro: {
+        id: macroId
+      },
+      ticket: {
+        id: ticketId
+      }
+    })
+  });
 }
 
 // Help Center article management functions
